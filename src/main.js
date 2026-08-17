@@ -4,18 +4,25 @@ import '@fontsource/manrope/400.css';
 import '@fontsource/manrope/500.css';
 import '@fontsource/manrope/600.css';
 import '@fontsource/manrope/700.css';
-import '@fontsource/noto-serif-sc/latin-500.css';
-import '@fontsource/noto-serif-sc/latin-600.css';
-import '@fontsource/noto-serif-sc/latin-700.css';
-import '@fontsource/noto-serif-sc/chinese-simplified-500.css';
-import '@fontsource/noto-serif-sc/chinese-simplified-600.css';
-import '@fontsource/noto-serif-sc/chinese-simplified-700.css';
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js';
-import { getGroundPlaneY, getMobileSceneComposition, getParticleColor, getPointerNdc, getScrollSceneState } from './model-effects.js';
+import {
+  getGroundPlaneY,
+  getBurstProgressStep,
+  getInteractionResponseStep,
+  getMobileSceneComposition,
+  getParticleColor,
+  getPointerNdc,
+  getRenderPixelRatio,
+  getScrollSceneState,
+  getScrollTransitionStep,
+  shouldRenderFormShadows,
+  shouldUpdateParticlePointer
+} from './model-effects.js';
+import { enableMeshRaycastAcceleration } from './mesh-raycast.js';
 import './styles.css';
 
 const canvas = document.querySelector('#scene');
@@ -25,7 +32,7 @@ const scrollLabel = document.querySelector('#scroll-label');
 const meterFill = document.querySelector('#meter-fill');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(getRenderPixelRatio(window.devicePixelRatio, window.innerWidth));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -101,6 +108,7 @@ let targetField = 0;
 let smoothField = 0;
 let targetBurst = 0;
 let smoothBurst = 0;
+let burstRetreating = false;
 let targetRotation = 0;
 let smoothRotation = 0;
 let pointer = new THREE.Vector2(0, 0);
@@ -110,9 +118,17 @@ let pointerPresence = 0;
 let time = 0;
 let lastFrameTime = 0;
 let lastRaycastPointer = new THREE.Vector2(99, 99);
+let lastRaycastRotation = Number.POSITIVE_INFINITY;
+let lastRaycastPosition = new THREE.Vector3(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
+let lastRaycastScale = Number.POSITIVE_INFINITY;
 let pointerHasHit = false;
 const pointerRaycaster = new THREE.Raycaster();
+pointerRaycaster.firstHitOnly = true;
 const pointerLocal = new THREE.Vector3();
+const particlePointerTarget = new THREE.Vector3();
+const previousParticlePointer = new THREE.Vector3();
+const particlePointerMotion = new THREE.Vector3();
+let hasParticlePointer = false;
 
 const loader = new FBXLoader();
 loader.load(
@@ -146,6 +162,7 @@ function normalizeModel(root) {
   root.position.copy(center).multiplyScalar(-scale);
   root.traverse((child) => {
     if (!child.isMesh) return;
+    enableMeshRaycastAcceleration(child);
     child.castShadow = true;
     child.receiveShadow = true;
     const materials = Array.isArray(child.material) ? child.material : [child.material];
@@ -391,7 +408,8 @@ function buildParticles(root) {
       uBurst: { value: 0 },
       uTime: { value: 0 },
       uPointer: { value: new THREE.Vector3() },
-      uPointerActive: { value: 0 }
+      uPointerActive: { value: 0 },
+      uPointerMotion: { value: new THREE.Vector3() }
     },
     vertexShader: `
       attribute vec3 color;
@@ -407,12 +425,14 @@ function buildParticles(root) {
       uniform float uTime;
       uniform vec3 uPointer;
       uniform float uPointerActive;
+      uniform vec3 uPointerMotion;
       void main() {
         vColor = color;
         float entered = smoothstep(0.0, 0.68, uTransition);
         float splash = sin(clamp(uTransition, 0.0, 1.0) * 3.14159265);
         float breath = sin(aPhase + uTime * 0.001) * 0.012 * entered;
-        float burst = pow(uBurst, 1.18);
+        float burst = smoothstep(0.0, 1.0, uBurst);
+        float burstRelease = burst;
         vec3 splatPosition = position;
         splatPosition += aDrift * (0.035 + splash * 1.34);
         splatPosition += aNormal * (0.016 + splash * 0.12 + breath);
@@ -422,15 +442,21 @@ function buildParticles(root) {
         float ripple = sin(interactionDistance * 14.0 - uTime * 0.008 + aPhase * 1.7) * 0.5 + 0.5;
         float interactionStrength = interactionInfluence * (0.14 + ripple * 0.095) * uPointerActive;
         vec3 radialDirection = interactionVector / interactionDistance;
+        vec3 swirlAxis = normalize(aNormal + vec3(0.0001, 0.0, 0.0));
+        vec3 tangentDirection = cross(swirlAxis, radialDirection);
+        tangentDirection /= max(length(tangentDirection), 0.0001);
+        float pointerSpeed = clamp(length(uPointerMotion) * 4.6, 0.0, 1.0);
+        float swirlStrength = interactionInfluence * (0.028 + pointerSpeed * 0.12 + ripple * 0.028) * uPointerActive;
         vec3 microDirection = normalize(aDrift + aNormal * 0.42 + vec3(sin(aPhase * 7.0), cos(aPhase * 5.0), sin(aPhase * 3.0)) * 0.08);
         vec3 interactionDirection = normalize(radialDirection * 0.72 + aNormal * 0.22 + microDirection * 0.16);
-        splatPosition += interactionDirection * interactionStrength * uTransition * (1.0 - uBurst);
-        splatPosition += aDrift * interactionInfluence * (0.012 + ripple * 0.04) * uPointerActive * uTransition * (1.0 - uBurst);
-        splatPosition.y += sin(uTime * 0.0012 + aPhase * 11.0) * 0.008 * interactionInfluence * uPointerActive * uTransition * (1.0 - uBurst);
-        splatPosition += aBurst * (4.5 * burst);
+        splatPosition += interactionDirection * interactionStrength * uTransition * (1.0 - burst);
+        splatPosition += tangentDirection * swirlStrength * uTransition * (1.0 - burst);
+        splatPosition += aDrift * interactionInfluence * (0.012 + ripple * 0.04) * uPointerActive * uTransition * (1.0 - burst);
+        splatPosition.y += sin(uTime * 0.0012 + aPhase * 11.0) * 0.008 * interactionInfluence * uPointerActive * uTransition * (1.0 - burst);
+        splatPosition += aBurst * (4.7 * burstRelease);
         vec4 viewPosition = modelViewMatrix * vec4(splatPosition, 1.0);
         float pulse = 1.0 + sin(uTime * 0.0011 + aPhase) * 0.07 * uTransition;
-        gl_PointSize = uSize * aScale * (300.0 / max(1.0, -viewPosition.z)) * mix(0.16, 1.0, entered) * mix(1.0, 1.22, burst) * pulse;
+        gl_PointSize = uSize * aScale * (300.0 / max(1.0, -viewPosition.z)) * mix(0.16, 1.0, entered) * mix(1.0, 1.18, burstRelease) * pulse;
         gl_Position = projectionMatrix * viewPosition;
       }
     `,
@@ -477,24 +503,56 @@ function setModelState(opacity, dissolve) {
 
 function onScroll() {
   const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-  targetScroll = THREE.MathUtils.clamp(window.scrollY / max, 0, 1);
+  const nextScroll = THREE.MathUtils.clamp(window.scrollY / max, 0, 1);
+  const delta = nextScroll - targetScroll;
+
+  if (delta < -0.00005) burstRetreating = true;
+  if (delta > 0.00005) burstRetreating = false;
+
+  targetScroll = nextScroll;
 }
 
-function updateSceneState() {
-  smoothScroll = THREE.MathUtils.lerp(smoothScroll, targetScroll, 0.085);
-  const scrollState = getScrollSceneState(smoothScroll);
+function updateSceneState(deltaSeconds) {
+  smoothScroll = getScrollTransitionStep({
+    current: smoothScroll,
+    target: targetScroll,
+    deltaSeconds,
+    rate: 8
+  });
+  const scrollState = getScrollSceneState(targetScroll);
   targetMorph = scrollState.morph;
   targetField = scrollState.field;
   targetBurst = scrollState.burst;
   targetRotation = scrollState.rotation;
-  smoothMorph = THREE.MathUtils.lerp(smoothMorph, targetMorph, 0.09);
-  smoothField = THREE.MathUtils.lerp(smoothField, targetField, 0.09);
-  smoothBurst = THREE.MathUtils.lerp(smoothBurst, targetBurst, 0.075);
-  smoothRotation = THREE.MathUtils.lerp(smoothRotation, targetRotation, 0.085);
+  smoothMorph = getScrollTransitionStep({
+    current: smoothMorph,
+    target: targetMorph,
+    deltaSeconds,
+    rate: 9
+  });
+  smoothField = getScrollTransitionStep({
+    current: smoothField,
+    target: targetField,
+    deltaSeconds,
+    rate: 9
+  });
+  smoothBurst = getBurstProgressStep({
+    current: smoothBurst,
+    target: targetBurst,
+    deltaSeconds,
+    retreating: burstRetreating
+  });
+  smoothRotation = getScrollTransitionStep({
+    current: smoothRotation,
+    target: targetRotation,
+    deltaSeconds,
+    rate: 7.5
+  });
   pointer.lerp(pointerTarget, 0.09);
   const dissolve = THREE.MathUtils.smoothstep(smoothMorph, 0.08, 0.96);
   const modelOpacity = 1 - THREE.MathUtils.smoothstep(smoothMorph, 0.72, 1);
   setModelState(modelOpacity, dissolve);
+  keyLight.castShadow = shouldRenderFormShadows(smoothMorph, smoothBurst);
   const isMobile = window.innerWidth < 760;
   const mobileComposition = getMobileSceneComposition(smoothScroll);
   const composition = isMobile ? mobileComposition : { x: 0, y: 0, scale: 1 };
@@ -506,7 +564,7 @@ function updateSceneState() {
   updateFloor();
   updateInteractionField();
   if (particleSystem) {
-    const particleOpacity = THREE.MathUtils.smoothstep(smoothMorph, 0.02, 0.82) * (0.82 - smoothBurst * 0.16);
+    const particleOpacity = THREE.MathUtils.smoothstep(smoothMorph, 0.02, 0.82) * (0.82 - smoothBurst * 0.06);
     particleSystem.material.uniforms.uOpacity.value = particleOpacity;
     particleSystem.material.uniforms.uTransition.value = smoothMorph;
     particleSystem.material.uniforms.uBurst.value = smoothBurst;
@@ -559,24 +617,60 @@ function updateInteractionField() {
 }
 
 const RAYCAST_THROTTLE_NDC = 0.003;
-function updateParticlePointer() {
+const RAYCAST_ROTATION_EPSILON = 0.002;
+const RAYCAST_POSITION_EPSILON_SQ = 0.000025;
+const RAYCAST_SCALE_EPSILON = 0.002;
+function updateParticlePointer(deltaSeconds) {
   if (!particleSystem || !model) return;
-  const pointerMoved = pointerTarget.distanceTo(lastRaycastPointer) >= RAYCAST_THROTTLE_NDC;
-  if (pointerMoved) {
+  const pointerMoved = pointerTarget.distanceToSquared(lastRaycastPointer) >= RAYCAST_THROTTLE_NDC ** 2;
+  const sceneMoved =
+    Math.abs(assetRoot.rotation.y - lastRaycastRotation) >= RAYCAST_ROTATION_EPSILON ||
+    assetRoot.position.distanceToSquared(lastRaycastPosition) >= RAYCAST_POSITION_EPSILON_SQ ||
+    Math.abs(assetRoot.scale.x - lastRaycastScale) >= RAYCAST_SCALE_EPSILON;
+
+  if (!hasPointer || smoothMorph < 0.05) {
+    pointerHasHit = false;
+    hasParticlePointer = false;
+  }
+  if (shouldUpdateParticlePointer({ hasPointer, morph: smoothMorph, pointerMoved, sceneMoved })) {
     lastRaycastPointer.copy(pointerTarget);
+    lastRaycastRotation = assetRoot.rotation.y;
+    lastRaycastPosition.copy(assetRoot.position);
+    lastRaycastScale = assetRoot.scale.x;
     assetRoot.updateWorldMatrix(true, true);
     camera.updateMatrixWorld();
     pointerRaycaster.setFromCamera(pointerTarget, camera);
     const intersection = pointerRaycaster.intersectObject(model, true)[0];
     if (intersection) {
       assetRoot.worldToLocal(pointerLocal.copy(intersection.point));
-      particleSystem.material.uniforms.uPointer.value.copy(pointerLocal);
+      particlePointerTarget.copy(pointerLocal);
+      hasParticlePointer = true;
     }
     pointerHasHit = Boolean(intersection);
   }
   const targetPresence = hasPointer && pointerHasHit ? 1 : 0;
-  pointerPresence = THREE.MathUtils.lerp(pointerPresence, targetPresence, 0.16);
+  pointerPresence = getInteractionResponseStep({
+    current: pointerPresence,
+    target: targetPresence,
+    deltaSeconds
+  });
+  if (hasParticlePointer) {
+    const particlePointer = particleSystem.material.uniforms.uPointer.value;
+    previousParticlePointer.copy(particlePointer);
+    const pointerFollow = getInteractionResponseStep({ current: 0, target: 1, deltaSeconds });
+    particlePointer.lerp(particlePointerTarget, pointerFollow);
+
+    if (pointerHasHit) {
+      particlePointerMotion.subVectors(particlePointer, previousParticlePointer).multiplyScalar(4.5);
+      const motionLength = particlePointerMotion.length();
+      if (motionLength > 0.16) particlePointerMotion.multiplyScalar(0.16 / motionLength);
+    } else {
+      particlePointerMotion.multiplyScalar(Math.exp(-9 * Math.min(deltaSeconds, 0.5)));
+    }
+  }
   particleSystem.material.uniforms.uPointerActive.value = pointerPresence;
+  const motionFollow = getInteractionResponseStep({ current: 0, target: 1, deltaSeconds });
+  particleSystem.material.uniforms.uPointerMotion.value.lerp(particlePointerMotion, motionFollow);
 }
 
 function animate(now = 0) {
@@ -585,16 +679,16 @@ function animate(now = 0) {
     lastFrameTime = now;
     return;
   }
-  const deltaSeconds = Math.max(0, Math.min((now - lastFrameTime) / 1000, 0.05));
+  const deltaSeconds = Math.max(0, Math.min((now - lastFrameTime) / 1000, 0.5));
   lastFrameTime = now;
   time += deltaSeconds * 1000;
-  updateSceneState();
+  updateSceneState(deltaSeconds);
   if (model) {
     assetRoot.rotation.x = THREE.MathUtils.lerp(assetRoot.rotation.x, pointer.y * 0.04, 0.04);
     assetRoot.rotation.z = THREE.MathUtils.lerp(assetRoot.rotation.z, pointer.x * -0.018, 0.04);
   }
   controls.update(deltaSeconds);
-  updateParticlePointer();
+  updateParticlePointer(deltaSeconds);
   renderer.render(scene, camera);
 }
 
@@ -612,7 +706,7 @@ function updateViewport() {
   controls.maxDistance = isMobile ? 11 : 10;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(getRenderPixelRatio(window.devicePixelRatio, window.innerWidth));
 }
 
 window.addEventListener('resize', updateViewport);

@@ -44,6 +44,42 @@ export function getPointerNdc(clientX, clientY, width, height, out = { x: 0, y: 
   return out;
 }
 
+export function getRenderPixelRatio(devicePixelRatio = 1, viewportWidth = 1024) {
+  const pixelRatio = Math.max(1, devicePixelRatio || 1);
+  const cap = viewportWidth < 760 ? 1.25 : 1.5;
+  return Math.min(pixelRatio, cap);
+}
+
+export function shouldUpdateParticlePointer({ hasPointer, morph, pointerMoved, sceneMoved }) {
+  return Boolean(hasPointer && morph >= 0.05 && (pointerMoved || sceneMoved));
+}
+
+export function shouldRenderFormShadows(morph, burst) {
+  return morph <= 0.06 && burst < 0.05;
+}
+
+export function getInteractionResponseStep({ current = 0, target = 0, deltaSeconds = 0 }) {
+  const delta = clamp(deltaSeconds, 0, 0.5);
+  const rate = target >= current ? 14 : 3.2;
+  const response = 1 - Math.exp(-rate * delta);
+  return current + (target - current) * response;
+}
+
+export function getBurstProgressStep({ current = 0, target = 0, deltaSeconds = 0, retreating = false }) {
+  if (retreating && target > current) return current;
+
+  const delta = clamp(deltaSeconds, 0, 0.5);
+  const rate = target >= current ? 1.15 : 9.5;
+  const response = 1 - Math.exp(-rate * delta);
+  return current + (target - current) * response;
+}
+
+export function getScrollTransitionStep({ current = 0, target = 0, deltaSeconds = 0, rate = 8 }) {
+  const delta = clamp(deltaSeconds, 0, 0.5);
+  const response = 1 - Math.exp(-Math.max(0, rate) * delta);
+  return current + (target - current) * response;
+}
+
 export function getParticleOffset(home, pointer, time, index, out = { x: 0, y: 0, z: 0 }) {
   const dx = home.x - pointer.x;
   const dy = home.y - pointer.y;
