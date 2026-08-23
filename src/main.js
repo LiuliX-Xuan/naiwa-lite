@@ -17,6 +17,7 @@ import {
   getParticleColor,
   getPointerNdc,
   getRenderPixelRatio,
+  recenterVectorTriplets,
   getScrollSceneState,
   getScrollTransitionStep,
   shouldRenderFormShadows,
@@ -366,6 +367,14 @@ function buildParticles(root) {
     }
     sampled += quota;
   });
+  const particleCenter = new THREE.Vector3();
+  for (let index = 0; index < points.length; index += 3) {
+    particleCenter.x += points[index];
+    particleCenter.y += points[index + 1];
+    particleCenter.z += points[index + 2];
+  }
+  particleCenter.multiplyScalar(1 / Math.max(1, points.length / 3));
+  recenterVectorTriplets(bursts);
   particleCount = points.length / 3;
   particleColors = new Float32Array(colors);
   const geometry = new THREE.BufferGeometry();
@@ -384,6 +393,7 @@ function buildParticles(root) {
       uBurst: { value: 0 },
       uDistortion: { value: 0 },
       uTunnel: { value: 0 },
+      uParticleCenter: { value: particleCenter },
       uTime: { value: 0 },
       uPointer: { value: new THREE.Vector3() },
       uPointerActive: { value: 0 },
@@ -402,6 +412,7 @@ function buildParticles(root) {
       uniform float uBurst;
       uniform float uDistortion;
       uniform float uTunnel;
+      uniform vec3 uParticleCenter;
       uniform float uTime;
       uniform vec3 uPointer;
       uniform float uPointerActive;
@@ -410,7 +421,7 @@ function buildParticles(root) {
         vColor = color;
         float entered = smoothstep(0.0, 0.68, uTransition);
         float splash = sin(clamp(uTransition, 0.0, 1.0) * 3.14159265);
-        float breath = sin(aPhase + uTime * 0.001) * 0.012 * entered;
+        float breath = sin(aPhase + uTime * 0.00055) * 0.009 * entered;
         float burst = smoothstep(0.0, 1.0, uBurst);
         float burstRelease = burst;
         vec3 splatPosition = position;
@@ -433,13 +444,14 @@ function buildParticles(root) {
         splatPosition += tangentDirection * swirlStrength * uTransition * (1.0 - burst);
         splatPosition += aDrift * interactionInfluence * (0.012 + ripple * 0.04) * uPointerActive * uTransition * (1.0 - burst);
         splatPosition.y += sin(uTime * 0.0012 + aPhase * 11.0) * 0.008 * interactionInfluence * uPointerActive * uTransition * (1.0 - burst);
-        float distortionWave = sin((position.y + position.x * 0.62 + uTime * 0.0018) * 12.0 + aPhase) * uDistortion;
+        float distortionWave = sin((position.y + position.x * 0.62 + uTime * 0.00085) * 12.0 + aPhase) * uDistortion;
         splatPosition += aNormal * distortionWave * 0.085;
         vec3 tunnelDirection = normalize(vec3(splatPosition.xy * 0.28 + aDrift.xy * 0.12, 1.0));
         splatPosition += tunnelDirection * uTunnel * (1.24 + aScale * 0.42);
         splatPosition += aBurst * (2.35 * burstRelease);
+        splatPosition -= uParticleCenter * burstRelease;
         vec4 viewPosition = modelViewMatrix * vec4(splatPosition, 1.0);
-        float pulse = 1.0 + sin(uTime * 0.0011 + aPhase) * 0.07 * uTransition;
+        float pulse = 1.0 + sin(uTime * 0.00055 + aPhase) * 0.045 * uTransition;
         gl_PointSize = uSize * aScale * (300.0 / max(1.0, -viewPosition.z)) * mix(0.16, 1.0, entered) * mix(1.0, 1.18, burstRelease) * pulse;
         gl_Position = projectionMatrix * viewPosition;
       }

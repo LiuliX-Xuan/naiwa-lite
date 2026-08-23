@@ -57,6 +57,34 @@ test('particle palette keeps dark and green texture accents', () => {
   assert.ok(eyeRing.g > eyeRing.r && eyeRing.g > eyeRing.b);
 });
 
+test('particle burst offsets are re-centered before release', () => {
+  const { recenterVectorTriplets } = modelEffects;
+  if (typeof recenterVectorTriplets !== 'function') {
+    assert.fail('recenterVectorTriplets should keep the release centred');
+    return;
+  }
+
+  const offsets = recenterVectorTriplets(new Float32Array([2, 1, 0, -1, 0, 1, 0, 2, -1]));
+  const mean = [0, 1, 2].map((axis) => offsets[axis] + offsets[axis + 3] + offsets[axis + 6]);
+
+  mean.forEach((value) => assert.ok(Math.abs(value) < 1e-6));
+});
+
+test('particle release consumes the centered offsets and keeps idle movement restrained', async () => {
+  const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+
+  assert.match(entry, /recenterVectorTriplets\(bursts\)/);
+  assert.match(entry, /uTime \* 0\.00055/);
+  assert.match(entry, /uTime \* 0\.00085/);
+});
+
+test('full release compensates for the sampled particle cloud center', async () => {
+  const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+
+  assert.match(entry, /uParticleCenter/);
+  assert.match(entry, /splatPosition -= uParticleCenter \* burstRelease/);
+});
+
 test('entry avoids shipping a full Chinese display font before the 3D scene loads', async () => {
   const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
   const styles = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
@@ -128,6 +156,7 @@ test('scroll state keeps the particle field active and rotates continuously', ()
   assert.equal(end.burst, 1);
   assert.equal(end.returnPhase, 0);
   assert.ok(end.rotation > morph.rotation);
+  assert.ok(field.rotation < Math.PI * 2);
 });
 
 test('mobile form framing clears room for the origin copy', () => {

@@ -22,7 +22,7 @@ export function getSpectacleScrollState(progress = 0) {
   const scroll = clamp(progress, 0, 1);
 
   return {
-    ripple: 0.48 + (1 - smoothstep(0.72, 1, scroll)) * 0.36,
+    ripple: 0.26 + (1 - smoothstep(0.72, 1, scroll)) * 0.22,
     grid: smoothstep(0.56, 0.78, scroll),
     distortion: smoothstep(0.2, 0.54, scroll) * (1 - smoothstep(0.82, 1, scroll) * 0.35),
     tunnel: smoothstep(0.84, 0.96, scroll),

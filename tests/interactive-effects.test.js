@@ -20,6 +20,7 @@ test('spectacle scroll state reserves the tunnel for the release range', () => {
   const release = getSpectacleScrollState(0.94);
 
   assert.ok(hero.ripple > 0.4);
+  assert.ok(hero.ripple <= 0.5);
   assert.equal(hero.grid, 0);
   assert.ok(signal.grid > 0.5);
   assert.equal(signal.tunnel, 0);
@@ -32,6 +33,7 @@ test('story exposes elastic words, magnetic targets, and fluid-trail targets', a
   assert.match(page, /data-elastic-text/);
   assert.match(page, /data-magnetic/);
   assert.match(page, /data-trail-target/);
+  assert.equal((page.match(/data-elastic-text/g) || []).length, 13);
 });
 
 test('text interaction module exposes elastic and pointer mounts', () => {
@@ -47,6 +49,7 @@ test('style layer includes ripple, kinetic grid, fluid trail, elastic return, an
   assert.match(styles, /\.fluid-trail/);
   assert.match(styles, /\.elastic-text\.is-returning/);
   assert.match(styles, /\[data-reading-sweep\]/);
+  assert.match(styles, /\.type-line\s*\{[^}]*overflow:\s*visible/);
 });
 
 test('elastic text styling follows the mounted data attribute', async () => {
@@ -54,6 +57,7 @@ test('elastic text styling follows the mounted data attribute', async () => {
 
   assert.match(styles, /\[data-elastic-text\]\.is-returning/);
   assert.match(styles, /\[data-elastic-text\]\[data-trail-target\]\s*\{[^}]*cursor:\s*grab/);
+  assert.match(styles, /\[data-elastic-text\]\.is-returning\s+\.elastic-glyph\s*\{[^}]*transition-duration:\s*\.78s/);
 });
 
 test('major supporting readouts remain interactive alongside the display text', async () => {

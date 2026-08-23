@@ -4,6 +4,30 @@ const smoothstep = (edge0, edge1, value) => {
   return t * t * (3 - 2 * t);
 };
 
+export function recenterVectorTriplets(values) {
+  const count = Math.floor(values.length / 3);
+  if (count === 0) return values;
+
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  for (let index = 0; index < count * 3; index += 3) {
+    x += values[index];
+    y += values[index + 1];
+    z += values[index + 2];
+  }
+
+  x /= count;
+  y /= count;
+  z /= count;
+  for (let index = 0; index < count * 3; index += 3) {
+    values[index] -= x;
+    values[index + 1] -= y;
+    values[index + 2] -= z;
+  }
+  return values;
+}
+
 export function getParticleColor(sampled = { r: 0.88, g: 0.72, b: 0.18 }, out = { r: 0, g: 0, b: 0 }) {
   const r = clamp(sampled.r ?? 0.88, 0, 1);
   const g = clamp(sampled.g ?? 0.72, 0, 1);
@@ -101,7 +125,7 @@ export function getScrollSceneState(progress) {
     morph: smoothstep(0.24, 0.58, normalized),
     field: smoothstep(0.55, 0.7, normalized),
     burst: smoothstep(0.76, 0.98, normalized),
-    rotation: normalized * Math.PI * 3.8,
+    rotation: normalized * Math.PI * 2.4,
     returnPhase: 0
   };
 }
