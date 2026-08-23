@@ -125,7 +125,7 @@ export function getScrollSceneState(progress) {
     morph: smoothstep(0.24, 0.58, normalized),
     field: smoothstep(0.55, 0.7, normalized),
     burst: smoothstep(0.76, 0.98, normalized),
-    rotation: normalized * Math.PI * 2.4,
+    rotation: normalized * Math.PI * 3.8,
     returnPhase: 0
   };
 }

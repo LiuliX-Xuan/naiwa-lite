@@ -27,12 +27,14 @@ test('spectacle scroll state reserves the tunnel for the release range', () => {
   assert.ok(release.tunnel > 0.7);
 });
 
-test('story exposes elastic words, magnetic targets, and fluid-trail targets', async () => {
+test('story exposes elastic words and magnetic targets without a pointer ripple layer', async () => {
   const page = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 
   assert.match(page, /data-elastic-text/);
   assert.match(page, /data-magnetic/);
   assert.match(page, /data-trail-target/);
+  assert.match(page, /fluid-trail/);
+  assert.doesNotMatch(page, /ripple-field/);
   assert.equal((page.match(/data-elastic-text/g) || []).length, 13);
 });
 
@@ -41,15 +43,28 @@ test('text interaction module exposes elastic and pointer mounts', () => {
   assert.equal(typeof mountPointerResponses, 'function');
 });
 
-test('style layer includes ripple, kinetic grid, fluid trail, elastic return, and reading response', async () => {
+test('style layer keeps the kinetic grid and cursor trail without a pointer ripple', async () => {
   const styles = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
 
-  assert.match(styles, /\.ripple-field/);
   assert.match(styles, /\.kinetic-grid/);
   assert.match(styles, /\.fluid-trail/);
+  assert.doesNotMatch(styles, /\.ripple-field/);
+  assert.doesNotMatch(styles, /--pointer-x/);
+  assert.doesNotMatch(styles, /--pointer-y/);
   assert.match(styles, /\.elastic-text\.is-returning/);
   assert.match(styles, /\[data-reading-sweep\]/);
   assert.match(styles, /\.type-line\s*\{[^}]*overflow:\s*visible/);
+});
+
+test('pointer responses retain cursor trail and reading interactions without ripple coordinates', async () => {
+  const interactions = await readFile(new URL('../src/text-interactions.js', import.meta.url), 'utf8');
+
+  assert.match(interactions, /fluid-trail/);
+  assert.match(interactions, /--trail-x/);
+  assert.match(interactions, /data-trail-target/);
+  assert.match(interactions, /\[data-reading-sweep\]/);
+  assert.doesNotMatch(interactions, /--pointer-x/);
+  assert.doesNotMatch(interactions, /--pointer-y/);
 });
 
 test('elastic text styling follows the mounted data attribute', async () => {

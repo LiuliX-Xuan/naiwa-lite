@@ -424,9 +424,10 @@ function buildParticles(root) {
         float breath = sin(aPhase + uTime * 0.00055) * 0.009 * entered;
         float burst = smoothstep(0.0, 1.0, uBurst);
         float burstRelease = burst;
+        float releaseSettle = 1.0 - step(0.0001, burstRelease);
         vec3 splatPosition = position;
-        splatPosition += aDrift * (0.035 + splash * 1.34);
-        splatPosition += aNormal * (0.016 + splash * 0.12 + breath);
+        splatPosition += aDrift * (0.035 + splash * 1.34) * releaseSettle;
+        splatPosition += aNormal * (0.016 + splash * 0.12 + breath) * releaseSettle;
         vec3 interactionVector = position - uPointer;
         float interactionDistance = max(length(interactionVector), 0.0001);
         float interactionInfluence = exp(-interactionDistance * interactionDistance * 2.2);
@@ -440,19 +441,25 @@ function buildParticles(root) {
         float swirlStrength = interactionInfluence * (0.028 + pointerSpeed * 0.12 + ripple * 0.028) * uPointerActive;
         vec3 microDirection = normalize(aDrift + aNormal * 0.42 + vec3(sin(aPhase * 7.0), cos(aPhase * 5.0), sin(aPhase * 3.0)) * 0.08);
         vec3 interactionDirection = normalize(radialDirection * 0.72 + aNormal * 0.22 + microDirection * 0.16);
-        splatPosition += interactionDirection * interactionStrength * uTransition * (1.0 - burst);
-        splatPosition += tangentDirection * swirlStrength * uTransition * (1.0 - burst);
-        splatPosition += aDrift * interactionInfluence * (0.012 + ripple * 0.04) * uPointerActive * uTransition * (1.0 - burst);
-        splatPosition.y += sin(uTime * 0.0012 + aPhase * 11.0) * 0.008 * interactionInfluence * uPointerActive * uTransition * (1.0 - burst);
+        splatPosition += interactionDirection * interactionStrength * uTransition * (1.0 - burst) * releaseSettle;
+        splatPosition += tangentDirection * swirlStrength * uTransition * (1.0 - burst) * releaseSettle;
+        splatPosition += aDrift * interactionInfluence * (0.012 + ripple * 0.04) * uPointerActive * uTransition * (1.0 - burst) * releaseSettle;
+        splatPosition.y += sin(uTime * 0.0012 + aPhase * 11.0) * 0.008 * interactionInfluence * uPointerActive * uTransition * (1.0 - burst) * releaseSettle;
         float distortionWave = sin((position.y + position.x * 0.62 + uTime * 0.00085) * 12.0 + aPhase) * uDistortion;
-        splatPosition += aNormal * distortionWave * 0.085;
+        splatPosition += aNormal * distortionWave * 0.085 * releaseSettle;
         vec3 tunnelDirection = normalize(vec3(splatPosition.xy * 0.28 + aDrift.xy * 0.12, 1.0));
-        splatPosition += tunnelDirection * uTunnel * (1.24 + aScale * 0.42);
-        splatPosition += aBurst * (2.35 * burstRelease);
-        splatPosition -= uParticleCenter * burstRelease;
+        splatPosition += tunnelDirection * uTunnel * (1.24 + aScale * 0.42) * releaseSettle;
+        splatPosition += aBurst * (4.7 * burstRelease);
+        float releaseMotion = burstRelease * sin(uTime * 0.00135);
+        float releaseSwirl = burstRelease * cos(uTime * 0.00135);
+        vec3 centeredSwirl = vec3(-aBurst.y, aBurst.x, 0.0);
+        splatPosition += aBurst * (releaseMotion * 0.075);
+        splatPosition += centeredSwirl * (releaseSwirl * 0.035);
+        splatPosition -= uParticleCenter * entered;
         vec4 viewPosition = modelViewMatrix * vec4(splatPosition, 1.0);
         float pulse = 1.0 + sin(uTime * 0.00055 + aPhase) * 0.045 * uTransition;
-        gl_PointSize = uSize * aScale * (300.0 / max(1.0, -viewPosition.z)) * mix(0.16, 1.0, entered) * mix(1.0, 1.18, burstRelease) * pulse;
+        float releasePulse = 1.0 + sin(uTime * 0.00135) * 0.055 * burstRelease;
+        gl_PointSize = uSize * aScale * (300.0 / max(1.0, -viewPosition.z)) * mix(0.16, 1.0, entered) * mix(1.0, 1.18, burstRelease) * pulse * releasePulse;
         gl_Position = projectionMatrix * viewPosition;
       }
     `,
@@ -544,7 +551,6 @@ function updateSceneState(deltaSeconds) {
   });
   pointer.lerp(pointerTarget, 0.09);
   const spectacle = getSpectacleScrollState(smoothScroll);
-  document.documentElement.style.setProperty('--ripple-opacity', spectacle.ripple.toFixed(3));
   document.documentElement.style.setProperty('--grid-opacity', spectacle.grid.toFixed(3));
   const dissolve = THREE.MathUtils.smoothstep(smoothMorph, 0.08, 0.96);
   const modelOpacity = 1 - THREE.MathUtils.smoothstep(smoothMorph, 0.72, 1);

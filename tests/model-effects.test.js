@@ -57,32 +57,40 @@ test('particle palette keeps dark and green texture accents', () => {
   assert.ok(eyeRing.g > eyeRing.r && eyeRing.g > eyeRing.b);
 });
 
-test('particle burst offsets are re-centered before release', () => {
+test('burst release is centered around the particle cloud', async () => {
   const { recenterVectorTriplets } = modelEffects;
-  if (typeof recenterVectorTriplets !== 'function') {
-    assert.fail('recenterVectorTriplets should keep the release centred');
-    return;
-  }
+  assert.equal(typeof recenterVectorTriplets, 'function');
 
   const offsets = recenterVectorTriplets(new Float32Array([2, 1, 0, -1, 0, 1, 0, 2, -1]));
   const mean = [0, 1, 2].map((axis) => offsets[axis] + offsets[axis + 3] + offsets[axis + 6]);
-
   mean.forEach((value) => assert.ok(Math.abs(value) < 1e-6));
+
+  const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(entry, /recenterVectorTriplets\(bursts\)/);
+  assert.match(entry, /uParticleCenter/);
+  assert.match(entry, /splatPosition -= uParticleCenter \* entered/);
+  assert.match(entry, /float releaseSettle = 1\.0 - step\(0\.0001, burstRelease\)/);
+  assert.match(entry, /aDrift \* \(0\.035 \+ splash \* 1\.34\) \* releaseSettle/);
+  assert.match(entry, /aNormal \* \(0\.016 \+ splash \* 0\.12 \+ breath\) \* releaseSettle/);
 });
 
-test('particle release consumes the centered offsets and keeps idle movement restrained', async () => {
+test('particle release uses the earlier wide burst profile while keeping gentle idle motion', async () => {
   const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
 
-  assert.match(entry, /recenterVectorTriplets\(bursts\)/);
+  assert.match(entry, /uTunnel \* \(1\.24 \+ aScale \* 0\.42\) \* releaseSettle/);
+  assert.match(entry, /aBurst \* \(4\.7 \* burstRelease\)/);
   assert.match(entry, /uTime \* 0\.00055/);
   assert.match(entry, /uTime \* 0\.00085/);
 });
 
-test('full release compensates for the sampled particle cloud center', async () => {
+test('release motion breathes and swirls around the fixed particle center', async () => {
   const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
 
-  assert.match(entry, /uParticleCenter/);
-  assert.match(entry, /splatPosition -= uParticleCenter \* burstRelease/);
+  assert.match(entry, /float releaseMotion = burstRelease \* sin\(uTime \* 0\.00135\)/);
+  assert.match(entry, /vec3 centeredSwirl = vec3\(-aBurst\.y, aBurst\.x, 0\.0\)/);
+  assert.match(entry, /splatPosition \+= aBurst \* \(releaseMotion \* 0\.075\)/);
+  assert.match(entry, /splatPosition \+= centeredSwirl \* \(releaseSwirl \* 0\.035\)/);
+  assert.match(entry, /float releasePulse = 1\.0 \+ sin\(uTime \* 0\.00135\) \* 0\.055 \* burstRelease/);
 });
 
 test('entry avoids shipping a full Chinese display font before the 3D scene loads', async () => {
@@ -141,22 +149,30 @@ test('pointer mapping keeps screen-up aligned with raycasting-up', () => {
   assert.equal(bottom.y, -1);
 });
 
-test('scroll state keeps the particle field active and rotates continuously', () => {
+test('scroll state keeps the particle field active and rotates through release', () => {
   const before = getScrollSceneState(0.1);
   const morph = getScrollSceneState(0.62);
-  const field = getScrollSceneState(0.76);
+  const release = getScrollSceneState(0.76);
   const end = getScrollSceneState(1);
 
   assert.equal(before.morph, 0);
   assert.ok(morph.morph > 0.9);
-  assert.equal(field.morph, 1);
-  assert.ok(field.field > 0.9);
+  assert.equal(release.morph, 1);
+  assert.ok(release.field > 0.9);
   assert.equal(end.morph, 1);
   assert.equal(end.field, 1);
   assert.equal(end.burst, 1);
   assert.equal(end.returnPhase, 0);
   assert.ok(end.rotation > morph.rotation);
-  assert.ok(field.rotation < Math.PI * 2);
+  assert.ok(release.rotation > Math.PI * 2);
+  assert.ok(end.rotation > release.rotation);
+});
+
+test('scene keeps the root rotation continuous through the burst', async () => {
+  const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(entry, /releaseAxisRotation/);
+  assert.match(entry, /assetRoot\.rotation\.y = smoothRotation/);
 });
 
 test('mobile form framing clears room for the origin copy', () => {
