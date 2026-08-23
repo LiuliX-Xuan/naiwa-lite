@@ -21,6 +21,34 @@ const {
   shouldUpdateParticlePointer
 } = modelEffects;
 
+test('retired orbit field calculations are not retained in the model-effects API', () => {
+  assert.equal('getFieldMotionState' in modelEffects, false);
+  assert.equal('getReleaseCollapse' in modelEffects, false);
+});
+
+test('Three scene consumes the spectacle state instead of the retired orbit field', async () => {
+  const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+
+  assert.match(entry, /getSpectacleScrollState/);
+  assert.doesNotMatch(entry, /createInteractionField/);
+  assert.match(entry, /--grid-opacity/);
+});
+
+test('particle shader exposes local distortion and tunnel controls', async () => {
+  const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+
+  assert.match(entry, /uDistortion/);
+  assert.match(entry, /uTunnel/);
+  assert.match(entry, /tunnelDirection/);
+});
+
+test('model hit state promotes the shared fluid trail', async () => {
+  const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+
+  assert.match(entry, /is-model-active/);
+  assert.match(entry, /fluidTrail/);
+});
+
 test('particle palette keeps dark and green texture accents', () => {
   const pupil = getParticleColor({ r: 0.08, g: 0.12, b: 0.03 });
   const eyeRing = getParticleColor({ r: 0.46, g: 0.72, b: 0.38 });

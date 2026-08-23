@@ -22,7 +22,9 @@ import {
   shouldRenderFormShadows,
   shouldUpdateParticlePointer
 } from './model-effects.js';
+import { getSpectacleScrollState } from './interactive-effects.js';
 import { enableMeshRaycastAcceleration } from './mesh-raycast.js';
+import { mountPointerResponses, mountTextInteractions } from './text-interactions.js';
 import './styles.css';
 
 const canvas = document.querySelector('#scene');
@@ -30,6 +32,7 @@ const loading = document.querySelector('#loading');
 const stateLabel = document.querySelector('#state-label');
 const scrollLabel = document.querySelector('#scroll-label');
 const meterFill = document.querySelector('#meter-fill');
+const fluidTrail = document.querySelector('.fluid-trail');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(getRenderPixelRatio(window.devicePixelRatio, window.innerWidth));
@@ -71,9 +74,6 @@ const assetRoot = new THREE.Group();
 assetRoot.position.y = -0.2;
 scene.add(assetRoot);
 
-const interactionField = createInteractionField();
-assetRoot.add(interactionField);
-
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(18, 18),
   new THREE.ShadowMaterial({ color: 0x7b867e, opacity: 0.18 })
@@ -104,8 +104,6 @@ let targetScroll = 0;
 let smoothScroll = 0;
 let targetMorph = 0;
 let smoothMorph = 0;
-let targetField = 0;
-let smoothField = 0;
 let targetBurst = 0;
 let smoothBurst = 0;
 let burstRetreating = false;
@@ -171,6 +169,7 @@ function normalizeModel(root) {
       material.transparent = true;
       material.userData.baseOpacity = material.opacity ?? 1;
       material.userData.dissolve = 0;
+      material.userData.surfaceDistortion = 0;
       material.alphaMap = null;
       material.alphaTest = 0;
       material.side = THREE.DoubleSide;
@@ -186,6 +185,16 @@ function normalizeModel(root) {
       }
       material.onBeforeCompile = (shader) => {
         shader.uniforms.uDissolve = { value: material.userData.dissolve };
+        shader.uniforms.uSurfaceDistortion = { value: material.userData.surfaceDistortion };
+        shader.uniforms.uDistortionTime = { value: 0 };
+        shader.vertexShader = `uniform float uSurfaceDistortion;\nuniform float uDistortionTime;\n${shader.vertexShader}`;
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+          vec3 liquidDirection = normalize(position + vec3(0.0001));
+          float liquidWave = sin((position.y - position.x * 0.58) * 12.0 + uDistortionTime * 0.0022);
+          transformed += liquidDirection * liquidWave * uSurfaceDistortion * 0.055;`
+        );
         shader.fragmentShader = `uniform float uDissolve;\n${shader.fragmentShader}`;
         shader.fragmentShader = shader.fragmentShader.replace(
           '#include <alphatest_fragment>',
@@ -207,39 +216,6 @@ function gaussianRandom() {
   const u = Math.max(Math.random(), 0.000001);
   const v = Math.max(Math.random(), 0.000001);
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(Math.PI * 2 * v);
-}
-
-function createInteractionField() {
-  const group = new THREE.Group();
-  const materials = [];
-  const orbitSpecs = [
-    { x: 2.05, y: 2.15, start: 0.15, end: Math.PI * 1.56, rotation: [0, 0.22, 0.04], offset: [0, 0.08, 0], color: 0x60756a, opacity: 0.18 },
-    { x: 2.22, y: 1.04, start: 0.38, end: Math.PI * 1.7, rotation: [Math.PI * 0.5, 0.28, 0], offset: [0, -0.42, 0.06], color: 0xd1b741, opacity: 0.2 },
-    { x: 1.72, y: 2.36, start: 0.72, end: Math.PI * 1.7, rotation: [0.1, 1.05, -0.12], offset: [0.03, 0.05, 0], color: 0x89b89e, opacity: 0.14 }
-  ];
-
-  orbitSpecs.forEach((spec) => {
-    const curve = new THREE.EllipseCurve(0, 0, spec.x, spec.y, spec.start, spec.end, false, 0);
-    const points = curve.getPoints(96).map((point) => new THREE.Vector3(point.x, point.y, 0));
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({ color: spec.color, transparent: true, opacity: spec.opacity, depthWrite: false });
-    const orbit = new THREE.Line(geometry, material);
-    orbit.rotation.set(...spec.rotation);
-    orbit.position.set(...spec.offset);
-    group.add(orbit);
-    materials.push({ material, opacity: spec.opacity });
-  });
-
-  const markerCount = 14;
-  const positions = new Float32Array(markerCount * 3);
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const material = new THREE.PointsMaterial({ color: 0xe2c94e, size: 0.05, transparent: true, opacity: 0.86, depthWrite: false, sizeAttenuation: true });
-  const markers = new THREE.Points(geometry, material);
-  group.add(markers);
-  materials.push({ material, opacity: 0.86 });
-  group.userData = { materials, markers, markerCount };
-  return group;
 }
 
 function createTextureSampler(texture) {
@@ -406,6 +382,8 @@ function buildParticles(root) {
       uSize: { value: 0.118 },
       uTransition: { value: 0 },
       uBurst: { value: 0 },
+      uDistortion: { value: 0 },
+      uTunnel: { value: 0 },
       uTime: { value: 0 },
       uPointer: { value: new THREE.Vector3() },
       uPointerActive: { value: 0 },
@@ -422,6 +400,8 @@ function buildParticles(root) {
       uniform float uSize;
       uniform float uTransition;
       uniform float uBurst;
+      uniform float uDistortion;
+      uniform float uTunnel;
       uniform float uTime;
       uniform vec3 uPointer;
       uniform float uPointerActive;
@@ -453,7 +433,11 @@ function buildParticles(root) {
         splatPosition += tangentDirection * swirlStrength * uTransition * (1.0 - burst);
         splatPosition += aDrift * interactionInfluence * (0.012 + ripple * 0.04) * uPointerActive * uTransition * (1.0 - burst);
         splatPosition.y += sin(uTime * 0.0012 + aPhase * 11.0) * 0.008 * interactionInfluence * uPointerActive * uTransition * (1.0 - burst);
-        splatPosition += aBurst * (4.7 * burstRelease);
+        float distortionWave = sin((position.y + position.x * 0.62 + uTime * 0.0018) * 12.0 + aPhase) * uDistortion;
+        splatPosition += aNormal * distortionWave * 0.085;
+        vec3 tunnelDirection = normalize(vec3(splatPosition.xy * 0.28 + aDrift.xy * 0.12, 1.0));
+        splatPosition += tunnelDirection * uTunnel * (1.24 + aScale * 0.42);
+        splatPosition += aBurst * (2.35 * burstRelease);
         vec4 viewPosition = modelViewMatrix * vec4(splatPosition, 1.0);
         float pulse = 1.0 + sin(uTime * 0.0011 + aPhase) * 0.07 * uTransition;
         gl_PointSize = uSize * aScale * (300.0 / max(1.0, -viewPosition.z)) * mix(0.16, 1.0, entered) * mix(1.0, 1.18, burstRelease) * pulse;
@@ -485,7 +469,7 @@ function buildParticles(root) {
   assetRoot.add(particleSystem);
 }
 
-function setModelState(opacity, dissolve) {
+function setModelState(opacity, dissolve, surfaceDistortion = 0) {
   if (!model) return;
   model.traverse((child) => {
     if (!child.isMesh) return;
@@ -495,7 +479,12 @@ function setModelState(opacity, dissolve) {
       material.opacity = (material.userData.baseOpacity ?? 1) * opacity;
       material.depthWrite = dissolve < 0.03;
       material.userData.dissolve = dissolve;
-      if (material.userData.dissolveShader) material.userData.dissolveShader.uniforms.uDissolve.value = dissolve;
+      material.userData.surfaceDistortion = surfaceDistortion;
+      if (material.userData.dissolveShader) {
+        material.userData.dissolveShader.uniforms.uDissolve.value = dissolve;
+        material.userData.dissolveShader.uniforms.uSurfaceDistortion.value = surfaceDistortion;
+        material.userData.dissolveShader.uniforms.uDistortionTime.value = time;
+      }
     });
     child.castShadow = dissolve < 0.58;
   });
@@ -521,18 +510,11 @@ function updateSceneState(deltaSeconds) {
   });
   const scrollState = getScrollSceneState(targetScroll);
   targetMorph = scrollState.morph;
-  targetField = scrollState.field;
   targetBurst = scrollState.burst;
   targetRotation = scrollState.rotation;
   smoothMorph = getScrollTransitionStep({
     current: smoothMorph,
     target: targetMorph,
-    deltaSeconds,
-    rate: 9
-  });
-  smoothField = getScrollTransitionStep({
-    current: smoothField,
-    target: targetField,
     deltaSeconds,
     rate: 9
   });
@@ -549,9 +531,13 @@ function updateSceneState(deltaSeconds) {
     rate: 7.5
   });
   pointer.lerp(pointerTarget, 0.09);
+  const spectacle = getSpectacleScrollState(smoothScroll);
+  document.documentElement.style.setProperty('--ripple-opacity', spectacle.ripple.toFixed(3));
+  document.documentElement.style.setProperty('--grid-opacity', spectacle.grid.toFixed(3));
   const dissolve = THREE.MathUtils.smoothstep(smoothMorph, 0.08, 0.96);
   const modelOpacity = 1 - THREE.MathUtils.smoothstep(smoothMorph, 0.72, 1);
-  setModelState(modelOpacity, dissolve);
+  const surfaceDistortion = spectacle.distortion * (0.18 + pointerPresence * 0.82) * (1 - smoothMorph * 0.42);
+  setModelState(modelOpacity, dissolve, surfaceDistortion);
   keyLight.castShadow = shouldRenderFormShadows(smoothMorph, smoothBurst);
   const isMobile = window.innerWidth < 760;
   const mobileComposition = getMobileSceneComposition(smoothScroll);
@@ -562,15 +548,16 @@ function updateSceneState(deltaSeconds) {
   assetRoot.scale.setScalar(rootScale);
   assetRoot.rotation.y = smoothRotation;
   updateFloor();
-  updateInteractionField();
   if (particleSystem) {
-    const particleOpacity = THREE.MathUtils.smoothstep(smoothMorph, 0.02, 0.82) * (0.82 - smoothBurst * 0.06);
+    const particleOpacity = THREE.MathUtils.smoothstep(smoothMorph, 0.02, 0.82) * (0.78 - spectacle.tunnel * 0.18);
     particleSystem.material.uniforms.uOpacity.value = particleOpacity;
     particleSystem.material.uniforms.uTransition.value = smoothMorph;
     particleSystem.material.uniforms.uBurst.value = smoothBurst;
+    particleSystem.material.uniforms.uDistortion.value = spectacle.distortion * (0.22 + pointerPresence * 0.78);
+    particleSystem.material.uniforms.uTunnel.value = spectacle.tunnel;
     particleSystem.material.uniforms.uTime.value = time;
   }
-  const state = smoothMorph < 0.04 ? 'FORM' : smoothField < 0.82 ? 'SPLAT' : smoothBurst < 0.08 ? 'FIELD' : 'BURST';
+  const state = smoothMorph < 0.04 ? 'FORM' : spectacle.tunnel > 0.1 ? 'TUNNEL' : smoothBurst < 0.08 ? 'FIELD' : 'BURST';
   stateLabel.textContent = state;
   scrollLabel.textContent = `${String(Math.round(smoothScroll * 100)).padStart(2, '0')}%`;
   meterFill.style.transform = `scaleX(${smoothScroll})`;
@@ -586,34 +573,6 @@ function updateFloor() {
     getGroundPlaneY(model.userData.groundY, assetRoot.position.y, assetRoot.scale.y),
     assetRoot.position.z
   );
-}
-
-function updateInteractionField() {
-  const presence = 1 - THREE.MathUtils.smoothstep(smoothMorph, 0.08, 0.68);
-  interactionField.visible = presence > 0.01;
-  interactionField.rotation.y = time * 0.00014 + pointer.x * 0.24;
-  interactionField.rotation.x = THREE.MathUtils.lerp(interactionField.rotation.x, pointer.y * 0.14, 0.05);
-  interactionField.rotation.z = THREE.MathUtils.lerp(interactionField.rotation.z, pointer.x * -0.08, 0.05);
-  const scale = 1 + (Math.abs(pointer.x) + Math.abs(pointer.y)) * 0.035;
-  interactionField.scale.setScalar(scale);
-  interactionField.userData.materials.forEach(({ material, opacity }) => {
-    material.opacity = opacity * presence;
-  });
-
-  const position = interactionField.userData.markers.geometry.attributes.position;
-  const markerCount = interactionField.userData.markerCount;
-  for (let index = 0; index < markerCount; index += 1) {
-    const angle = time * 0.00042 + index * 0.91;
-    const radius = 1.38 + (index % 3) * 0.34;
-    const bob = Math.sin(angle * 1.7 + index) * 0.24;
-    position.setXYZ(
-      index,
-      Math.cos(angle) * radius + pointer.x * 0.09,
-      Math.sin(angle * 0.72) * 1.35 + bob + pointer.y * -0.08,
-      Math.sin(angle) * (0.82 + (index % 2) * 0.2)
-    );
-  }
-  position.needsUpdate = true;
 }
 
 const RAYCAST_THROTTLE_NDC = 0.003;
@@ -671,6 +630,7 @@ function updateParticlePointer(deltaSeconds) {
   particleSystem.material.uniforms.uPointerActive.value = pointerPresence;
   const motionFollow = getInteractionResponseStep({ current: 0, target: 1, deltaSeconds });
   particleSystem.material.uniforms.uPointerMotion.value.lerp(particlePointerMotion, motionFollow);
+  fluidTrail?.classList.toggle('is-model-active', pointerPresence > 0.06);
 }
 
 function animate(now = 0) {
@@ -711,6 +671,8 @@ function updateViewport() {
 
 window.addEventListener('resize', updateViewport);
 
+mountTextInteractions();
+mountPointerResponses();
 onScroll();
 updateViewport();
 animate();
