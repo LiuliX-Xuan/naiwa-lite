@@ -3,4 +3,5 @@ dist/
 *.log
 .npm-cache/
 .edge-tmp/
+.superpowers/
 .DS_Store
