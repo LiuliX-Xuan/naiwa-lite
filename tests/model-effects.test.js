@@ -17,6 +17,7 @@ const {
   getRenderPixelRatio,
   getScrollSceneState,
   getScrollTransitionStep,
+  getTunnelReleaseAmount,
   shouldRenderFormShadows,
   shouldUpdateParticlePointer
 } = modelEffects;
@@ -30,6 +31,8 @@ test('Three scene consumes the spectacle state instead of the retired orbit fiel
   const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
 
   assert.match(entry, /getSpectacleScrollState/);
+  assert.match(entry, /const scrollState = getScrollSceneState\(smoothScroll\)/);
+  assert.doesNotMatch(entry, /const scrollState = getScrollSceneState\(targetScroll\)/);
   assert.doesNotMatch(entry, /createInteractionField/);
   assert.match(entry, /--grid-opacity/);
 });
@@ -67,9 +70,10 @@ test('burst release is centered around the particle cloud', async () => {
 
   const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
   assert.match(entry, /recenterVectorTriplets\(bursts\)/);
+  assert.match(entry, /recenterVectorTriplets\(drifts\)/);
   assert.match(entry, /uParticleCenter/);
   assert.match(entry, /splatPosition -= uParticleCenter \* entered/);
-  assert.match(entry, /float releaseSettle = 1\.0 - step\(0\.0001, burstRelease\)/);
+  assert.match(entry, /float releaseSettle = 1\.0 - smoothstep\(0\.0, 0\.24, burstRelease\)/);
   assert.match(entry, /aDrift \* \(0\.035 \+ splash \* 1\.34\) \* releaseSettle/);
   assert.match(entry, /aNormal \* \(0\.016 \+ splash \* 0\.12 \+ breath\) \* releaseSettle/);
 });
@@ -103,13 +107,29 @@ test('entry avoids shipping a full Chinese display font before the 3D scene load
 
 test('editorial typography keeps headings readable while adding a scroll-linked art direction layer', async () => {
   const page = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+  const motion = await readFile(new URL('../src/motion-effects.js', import.meta.url), 'utf8').catch(() => '');
   const styles = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
 
   assert.match(page, /class="type-line"/);
   assert.match(page, /class="type-line type-line-final"/);
   assert.match(page, /data-display="ORIGIN"/);
+  assert.match(entry, /mountMotionEffects/);
+  assert.match(motion, /ScrollTrigger/);
   assert.match(styles, /\.hero-title::after/);
-  assert.match(styles, /animation-timeline: view\(\)/);
+  assert.doesNotMatch(styles, /animation-timeline: view\(\)/);
+  assert.match(styles, /ZCOOL KuaiLe/);
+  assert.match(styles, /ZCOOL QingKe HuangYou/);
+  assert.doesNotMatch(styles, /Chiron GoRound TC/);
+  assert.match(styles, /--display:\s*'ZCOOL QingKe HuangYou',\s*'ZCOOL KuaiLe'/);
+  assert.match(styles, /--display-weight: 400/);
+  assert.match(styles, /--type-yellow: #d8b844/);
+  assert.match(styles, /--type-yellow-soft: #aa984f/);
+  assert.match(styles, /font-weight: var\(--display-weight\)/);
+  assert.match(styles, /h2 em\s*\{[^}]*font-style: normal/);
+  assert.match(styles, /\.hero-title::after\s*\{[^}]*font-family: var\(--display\)/);
+  assert.match(styles, /-webkit-text-stroke: 0/);
+  assert.match(styles, /-webkit-text-stroke: 1px rgba\(216, 184, 68, \.42\)/);
   assert.match(styles, /html, body \{[^}]*overflow-x: hidden/);
   assert.match(styles, /font-size: clamp\(34px, 9\.7vw, 38px\)/);
 });
@@ -168,6 +188,17 @@ test('scroll state keeps the particle field active and rotates through release',
   assert.ok(end.rotation > release.rotation);
 });
 
+test('tunnel movement yields to the burst intent before lateral release drift can build', async () => {
+  assert.equal(typeof getTunnelReleaseAmount, 'function');
+  assert.ok(getTunnelReleaseAmount({ tunnel: 1, burstIntent: 0.08 }) > 0.6);
+  assert.ok(getTunnelReleaseAmount({ tunnel: 1, burstIntent: 0.2 }) < 0.1);
+  assert.equal(getTunnelReleaseAmount({ tunnel: 1, burstIntent: 0.4 }), 0);
+
+  const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(entry, /getTunnelReleaseAmount/);
+  assert.match(entry, /burstIntent: targetBurst/);
+});
+
 test('scene keeps the root rotation continuous through the burst', async () => {
   const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
 
@@ -184,6 +215,13 @@ test('mobile form framing clears room for the origin copy', () => {
   assert.ok(form.x > 0.8);
   assert.ok(form.scale < 1);
   assert.equal(later.x, 0);
+});
+
+test('desktop composition keeps the original neutral model framing', async () => {
+  const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(entry, /getDesktopSceneComposition/);
+  assert.match(entry, /const composition = isMobile \? mobileComposition : \{ x: 0, y: 0, scale: 1 \}/);
 });
 
 test('ground plane follows the normalized model bottom as the scene moves and scales', () => {

@@ -4,6 +4,7 @@ import '@fontsource/manrope/400.css';
 import '@fontsource/manrope/500.css';
 import '@fontsource/manrope/600.css';
 import '@fontsource/manrope/700.css';
+import { gsap } from 'gsap';
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -20,19 +21,19 @@ import {
   recenterVectorTriplets,
   getScrollSceneState,
   getScrollTransitionStep,
+  getTunnelReleaseAmount,
   shouldRenderFormShadows,
   shouldUpdateParticlePointer
 } from './model-effects.js';
 import { getSpectacleScrollState } from './interactive-effects.js';
 import { enableMeshRaycastAcceleration } from './mesh-raycast.js';
-import { mountPointerResponses, mountTextInteractions } from './text-interactions.js';
+import { mountMotionEffects } from './motion-effects.js';
+import { mountOriginComponents, mountPointerResponses, mountTextInteractions } from './text-interactions.js';
 import './styles.css';
 
 const canvas = document.querySelector('#scene');
 const loading = document.querySelector('#loading');
 const stateLabel = document.querySelector('#state-label');
-const scrollLabel = document.querySelector('#scroll-label');
-const meterFill = document.querySelector('#meter-fill');
 const fluidTrail = document.querySelector('.fluid-trail');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
@@ -128,6 +129,66 @@ const particlePointerTarget = new THREE.Vector3();
 const previousParticlePointer = new THREE.Vector3();
 const particlePointerMotion = new THREE.Vector3();
 let hasParticlePointer = false;
+let motionEffects;
+let modelReady = false;
+let loadFailed = false;
+let modelIntroStarted = false;
+let modelIntroTimeline;
+const modelEntrance = {
+  opacity: 0,
+  scale: 0.82,
+  squash: 1.18,
+  lift: 0.22,
+  tilt: 0.1,
+  roll: -0.05
+};
+
+function playModelIntro() {
+  if (!model) return;
+
+  modelIntroTimeline?.kill();
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    Object.assign(modelEntrance, { opacity: 1, scale: 1, squash: 1, lift: 0, tilt: 0, roll: 0 });
+    return;
+  }
+
+  gsap.set(modelEntrance, { opacity: 0, scale: 0.82, squash: 1.18, lift: 0.22, tilt: 0.1, roll: -0.05 });
+  modelIntroTimeline = gsap.timeline({ defaults: { overwrite: 'auto' } })
+    .to(modelEntrance, {
+      opacity: 1,
+      scale: 1.04,
+      squash: 0.9,
+      lift: 0.02,
+      tilt: -0.035,
+      roll: 0.025,
+      duration: 0.62,
+      ease: 'power3.out'
+    })
+    .to(modelEntrance, {
+      scale: 1,
+      squash: 1,
+      lift: 0,
+      tilt: 0,
+      roll: 0,
+      duration: 0.82,
+      ease: 'elastic.out(1, 0.42)'
+    }, '-=0.12');
+}
+
+function syncIntroState() {
+  if (!motionEffects) return;
+  if (loadFailed) {
+    motionEffects.revealFallback();
+    return;
+  }
+  if (modelReady) {
+    motionEffects.playIntro();
+    if (!modelIntroStarted) {
+      modelIntroStarted = true;
+      playModelIntro();
+    }
+  }
+}
 
 const loader = new FBXLoader();
 loader.load(
@@ -138,11 +199,12 @@ loader.load(
     assetRoot.add(model);
     model.updateMatrixWorld(true);
     waitForTextureMaps(model);
-    loading.classList.add('is-hidden');
   },
   undefined,
   (error) => {
     loadError = true;
+    loadFailed = true;
+    syncIntroState();
     loading.innerHTML = '<span class="loading-dot"></span><span>MODEL LOAD ERROR</span>';
     console.error('FBX load failed', error);
   }
@@ -269,7 +331,12 @@ function waitForTextureMaps(root, retries = 45) {
     });
   });
   const ready = textures.length === 0 || textures.every((texture) => texture.image && (texture.image.naturalWidth || texture.image.width));
-  if (ready || retries <= 0) return buildParticles(root);
+  if (ready || retries <= 0) {
+    buildParticles(root);
+    modelReady = true;
+    syncIntroState();
+    return;
+  }
   requestAnimationFrame(() => waitForTextureMaps(root, retries - 1));
 }
 
@@ -374,6 +441,7 @@ function buildParticles(root) {
     particleCenter.z += points[index + 2];
   }
   particleCenter.multiplyScalar(1 / Math.max(1, points.length / 3));
+  recenterVectorTriplets(drifts);
   recenterVectorTriplets(bursts);
   particleCount = points.length / 3;
   particleColors = new Float32Array(colors);
@@ -424,7 +492,7 @@ function buildParticles(root) {
         float breath = sin(aPhase + uTime * 0.00055) * 0.009 * entered;
         float burst = smoothstep(0.0, 1.0, uBurst);
         float burstRelease = burst;
-        float releaseSettle = 1.0 - step(0.0001, burstRelease);
+        float releaseSettle = 1.0 - smoothstep(0.0, 0.24, burstRelease);
         vec3 splatPosition = position;
         splatPosition += aDrift * (0.035 + splash * 1.34) * releaseSettle;
         splatPosition += aNormal * (0.016 + splash * 0.12 + breath) * releaseSettle;
@@ -527,7 +595,7 @@ function updateSceneState(deltaSeconds) {
     deltaSeconds,
     rate: 8
   });
-  const scrollState = getScrollSceneState(targetScroll);
+  const scrollState = getScrollSceneState(smoothScroll);
   targetMorph = scrollState.morph;
   targetBurst = scrollState.burst;
   targetRotation = scrollState.rotation;
@@ -551,9 +619,13 @@ function updateSceneState(deltaSeconds) {
   });
   pointer.lerp(pointerTarget, 0.09);
   const spectacle = getSpectacleScrollState(smoothScroll);
+  const tunnelRelease = getTunnelReleaseAmount({
+    tunnel: spectacle.tunnel,
+    burstIntent: targetBurst
+  });
   document.documentElement.style.setProperty('--grid-opacity', spectacle.grid.toFixed(3));
   const dissolve = THREE.MathUtils.smoothstep(smoothMorph, 0.08, 0.96);
-  const modelOpacity = 1 - THREE.MathUtils.smoothstep(smoothMorph, 0.72, 1);
+  const modelOpacity = (1 - THREE.MathUtils.smoothstep(smoothMorph, 0.72, 1)) * modelEntrance.opacity;
   const surfaceDistortion = spectacle.distortion * (0.18 + pointerPresence * 0.82) * (1 - smoothMorph * 0.42);
   setModelState(modelOpacity, dissolve, surfaceDistortion);
   keyLight.castShadow = shouldRenderFormShadows(smoothMorph, smoothBurst);
@@ -561,24 +633,24 @@ function updateSceneState(deltaSeconds) {
   const mobileComposition = getMobileSceneComposition(smoothScroll);
   const composition = isMobile ? mobileComposition : { x: 0, y: 0, scale: 1 };
   assetRoot.position.x = THREE.MathUtils.lerp(assetRoot.position.x, composition.x, 0.08);
-  assetRoot.position.y = THREE.MathUtils.lerp(assetRoot.position.y, (isMobile ? 0.25 : -0.2) + composition.y, 0.08);
-  const rootScale = THREE.MathUtils.lerp(assetRoot.scale.x, composition.scale, 0.08);
-  assetRoot.scale.setScalar(rootScale);
+  assetRoot.position.y = THREE.MathUtils.lerp(assetRoot.position.y, (isMobile ? 0.25 : -0.2) + composition.y + modelEntrance.lift, 0.08);
+  const rootScale = THREE.MathUtils.lerp(assetRoot.scale.x, composition.scale * modelEntrance.scale, 0.08);
+  const squashX = 1 + (modelEntrance.squash - 1) * 0.42;
+  const squashY = 1 - (modelEntrance.squash - 1) * 0.58;
+  assetRoot.scale.set(rootScale * squashX, rootScale * squashY, rootScale);
   assetRoot.rotation.y = smoothRotation;
   updateFloor();
   if (particleSystem) {
-    const particleOpacity = THREE.MathUtils.smoothstep(smoothMorph, 0.02, 0.82) * (0.78 - spectacle.tunnel * 0.18);
+    const particleOpacity = THREE.MathUtils.smoothstep(smoothMorph, 0.02, 0.82) * (0.78 - tunnelRelease * 0.18);
     particleSystem.material.uniforms.uOpacity.value = particleOpacity;
     particleSystem.material.uniforms.uTransition.value = smoothMorph;
     particleSystem.material.uniforms.uBurst.value = smoothBurst;
     particleSystem.material.uniforms.uDistortion.value = spectacle.distortion * (0.22 + pointerPresence * 0.78);
-    particleSystem.material.uniforms.uTunnel.value = spectacle.tunnel;
+    particleSystem.material.uniforms.uTunnel.value = tunnelRelease;
     particleSystem.material.uniforms.uTime.value = time;
   }
-  const state = smoothMorph < 0.04 ? 'FORM' : spectacle.tunnel > 0.1 ? 'TUNNEL' : smoothBurst < 0.08 ? 'FIELD' : 'BURST';
+  const state = smoothMorph < 0.04 ? 'FORM' : tunnelRelease > 0.1 ? 'TUNNEL' : smoothBurst < 0.08 ? 'FIELD' : 'BURST';
   stateLabel.textContent = state;
-  scrollLabel.textContent = `${String(Math.round(smoothScroll * 100)).padStart(2, '0')}%`;
-  meterFill.style.transform = `scaleX(${smoothScroll})`;
 }
 
 function updateFloor() {
@@ -662,8 +734,8 @@ function animate(now = 0) {
   time += deltaSeconds * 1000;
   updateSceneState(deltaSeconds);
   if (model) {
-    assetRoot.rotation.x = THREE.MathUtils.lerp(assetRoot.rotation.x, pointer.y * 0.04, 0.04);
-    assetRoot.rotation.z = THREE.MathUtils.lerp(assetRoot.rotation.z, pointer.x * -0.018, 0.04);
+    assetRoot.rotation.x = THREE.MathUtils.lerp(assetRoot.rotation.x, pointer.y * 0.04 + modelEntrance.tilt, 0.04);
+    assetRoot.rotation.z = THREE.MathUtils.lerp(assetRoot.rotation.z, pointer.x * -0.018 + modelEntrance.roll, 0.04);
   }
   controls.update(deltaSeconds);
   updateParticlePointer(deltaSeconds);
@@ -679,7 +751,7 @@ function updateViewport() {
   const isMobile = window.innerWidth < 760;
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.position.z = isMobile ? 9.1 : 7.4;
-  assetRoot.position.y = isMobile ? 0.25 : -0.2;
+  assetRoot.position.y = (isMobile ? 0.25 : -0.2) + modelEntrance.lift;
   controls.minDistance = isMobile ? 7.2 : 4.8;
   controls.maxDistance = isMobile ? 11 : 10;
   camera.updateProjectionMatrix();
@@ -690,7 +762,11 @@ function updateViewport() {
 window.addEventListener('resize', updateViewport);
 
 mountTextInteractions();
+mountOriginComponents();
 mountPointerResponses();
+motionEffects = mountMotionEffects();
+document.documentElement.classList.remove('app-loading');
+syncIntroState();
 onScroll();
 updateViewport();
 animate();

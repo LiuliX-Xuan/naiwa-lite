@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#eef0ec" />
     <link rel="icon" href="data:," />
+    <script>document.documentElement.classList.add('app-loading');</script>
+    <style>
+      html.app-loading .story,
+      html.app-loading .site-header,
+      html.app-loading .hud,
+      html.app-loading .viewport {
+        visibility: hidden;
+      }
+    </style>
     <title>奶蛙 / NAIWA</title>
   </head>
   <body>
@@ -52,12 +61,24 @@
             <h2 class="chapter-title"><span class="type-line"><span data-elastic-text data-follow="7" data-trail-target>产品原型：</span></span><span class="type-line type-line-accent"><span><em data-elastic-text data-follow="8" data-trail-target>一只被保留的</em></span></span><span class="type-line type-line-final"><span><em data-elastic-text data-follow="7" data-trail-target>生成误差。</em></span></span></h2>
             <p class="chapter-copy" data-reading-sweep data-trail-target>在这份角色档案里，它来自一次 AI 动作生成的偶然崩坏：淡黄软壳承接拳法般的姿态，颈部消失，躯干在比例失衡中膨胀成圆胖而沉默的轮廓。</p>
             <div class="chapter-index" data-magnetic data-trail-target>ORIGIN FRAGMENT <span>03 PARTS</span></div>
-            <div class="origin-legend" aria-label="角色组成" data-magnetic data-trail-target>
-              <span><b>壳</b>淡黄色软躯干</span>
-              <span><b>势</b>拳法般的姿态</span>
-              <span><b>声</b>被拉伸的狂笑</span>
+            <div class="origin-traits" aria-label="角色组成">
+              <button class="origin-trait is-active" type="button" data-origin-tab="shell" data-magnetic data-trail-target><span>壳</span><b>SOFT SHELL</b><em>淡黄色软躯干</em></button>
+              <button class="origin-trait" type="button" data-origin-tab="stance" data-magnetic data-trail-target><span>势</span><b>LOCKED POSE</b><em>拳法般的姿态</em></button>
+              <button class="origin-trait" type="button" data-origin-tab="voice" data-magnetic data-trail-target><span>声</span><b>STRETCHED LAUGH</b><em>被拉伸的狂笑</em></button>
             </div>
           </div>
+          <aside class="origin-profile" aria-label="角色资料模块">
+            <p class="origin-profile-kicker">SPECIMEN / 02</p>
+            <div class="origin-profile-tabs" role="tablist" aria-label="角色资料维度">
+              <button class="origin-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="origin-profile-detail" data-origin-tab="shell" data-origin-title="SOFT SHELL" data-origin-detail="淡黄色软躯干，将重心压在圆胖的体积里。" data-magnetic data-trail-target><span>01</span><b>壳</b><i>BODY</i></button>
+              <button class="origin-tab" type="button" role="tab" aria-selected="false" aria-controls="origin-profile-detail" data-origin-tab="stance" data-origin-title="LOCKED POSE" data-origin-detail="拳法般的姿态被停在生成失误的中间帧。" data-magnetic data-trail-target><span>02</span><b>势</b><i>STANCE</i></button>
+              <button class="origin-tab" type="button" role="tab" aria-selected="false" aria-controls="origin-profile-detail" data-origin-tab="voice" data-origin-title="STRETCHED LAUGH" data-origin-detail="被拉伸的狂笑没有声音，只留下轮廓的余震。" data-magnetic data-trail-target><span>03</span><b>声</b><i>VOICE</i></button>
+            </div>
+            <div class="origin-profile-detail" id="origin-profile-detail" aria-live="polite" data-trail-target>
+              <strong>SOFT SHELL</strong>
+              <p>淡黄色软躯干，将重心压在圆胖的体积里。</p>
+            </div>
+          </aside>
         </section>
 
         <section id="material" class="story-section chapter chapter-material" data-scene="material" data-display="SOFT">
@@ -98,8 +119,6 @@
 
       <aside class="hud" aria-live="polite" data-magnetic data-trail-target>
         <div class="hud-row"><span class="hud-label">STATE</span><span id="state-label">FORM</span></div>
-        <div class="hud-row"><span class="hud-label">SCROLL</span><span id="scroll-label">00%</span></div>
-        <div class="hud-meter"><span id="meter-fill"></span></div>
       </aside>
 
       <div class="loading" id="loading"><span class="loading-dot"></span><span>LOADING SPECIMEN</span></div>

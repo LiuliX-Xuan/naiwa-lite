@@ -104,6 +104,12 @@ export function getScrollTransitionStep({ current = 0, target = 0, deltaSeconds 
   return current + (target - current) * response;
 }
 
+export function getTunnelReleaseAmount({ tunnel = 0, burstIntent = 0 } = {}) {
+  const tunnelAmount = clamp(tunnel, 0, 1);
+  const release = smoothstep(0, 0.24, clamp(burstIntent, 0, 1));
+  return tunnelAmount * (1 - release);
+}
+
 export function getParticleOffset(home, pointer, time, index, out = { x: 0, y: 0, z: 0 }) {
   const dx = home.x - pointer.x;
   const dy = home.y - pointer.y;
