@@ -35,26 +35,3 @@ test('signal speed drives visible particle motion and centers its control block'
   assert.match(css, /\.signal-console\s*\{[^}]*align-self:\s*center/);
   assert.match(css, /\.signal-console\s*\{[^}]*transform:\s*none/);
 });
-
-test('instrument panels use accessible custom range sliders without changing their state keys', async () => {
-  const page = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-  const main = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
-  const interactions = await readFile(new URL('../src/text-interactions.js', import.meta.url), 'utf8');
-
-  assert.match(page, /<range-slider[^>]+data-instrument-key="material\.roughness"/);
-  assert.match(page, /<range-slider[^>]+data-instrument-key="signal\.speed"/);
-  assert.doesNotMatch(page, /<input[^>]+data-instrument-key="material\.roughness"/);
-  assert.match(main, /import ['"]range-slider-element['"];/);
-  assert.match(interactions, /matches\?\.\(['"]range-slider['"]\)/);
-  assert.match(interactions, /addEventListener\('input', apply\)/);
-  assert.match(interactions, /matches\?\.\('range-slider'\)\) control\.addEventListener\('change', apply\)/);
-});
-
-test('instrument sliders share the pale yellow and dark green visual treatment', async () => {
-  const css = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
-
-  assert.match(css, /\.instrument-range range-slider\s*\{[^}]*--track-size:\s*5px[^}]*--thumb-size:\s*16px/);
-  assert.match(css, /\.instrument-range range-slider \[data-track-fill\][\s\S]*?background:\s*var\(--yellow\)/);
-  assert.match(css, /\.instrument-range range-slider \[data-track\][\s\S]*?rgba\(21, 34, 28, \.72\)/);
-  assert.match(css, /\.instrument-range range-slider:focus-visible \[data-thumb\]/);
-});

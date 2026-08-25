@@ -4,8 +4,6 @@ import '@fontsource/manrope/400.css';
 import '@fontsource/manrope/500.css';
 import '@fontsource/manrope/600.css';
 import '@fontsource/manrope/700.css';
-import 'range-slider-element';
-import 'range-slider-element/style.css';
 import { gsap } from 'gsap';
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';

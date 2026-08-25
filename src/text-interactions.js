@@ -230,8 +230,7 @@ function updateInstrumentOutputs(state) {
     if (!key) return;
     const [group, property] = key.split('.');
     const current = property ? state[group][property] : state[key];
-    const isRangeControl = control.type === 'range' || control.matches?.('range-slider');
-    if (isRangeControl) {
+    if (control.type === 'range') {
       control.value = String(Math.round(Number(current) * 100));
       control.style.setProperty('--instrument-progress', `${control.value}%`);
       return;
@@ -265,20 +264,14 @@ export function mountInstrumentControls(onChange) {
   document.querySelectorAll('[data-instrument-control]').forEach((control) => {
     const key = control.dataset.instrumentKey;
     if (!key) return;
-    const isRangeControl = control.type === 'range' || control.matches?.('range-slider');
     const apply = () => {
-      const value = isRangeControl
+      const value = control.type === 'range'
         ? Number(control.value) / 100
         : control.dataset.instrumentValue;
       setInstrumentValue(state, key, value);
       update(key.split('.')[0]);
     };
-    if (isRangeControl) {
-      control.addEventListener('input', apply);
-      if (control.matches?.('range-slider')) control.addEventListener('change', apply);
-    } else {
-      control.addEventListener('click', apply);
-    }
+    control.addEventListener(control.type === 'range' ? 'input' : 'click', apply);
   });
 
   const triggers = [...document.querySelectorAll('[data-instrument]')].map((instrument) => {

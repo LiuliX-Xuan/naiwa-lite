@@ -71,9 +71,9 @@
               <span class="instrument-status"><i aria-hidden="true"></i>实时同步</span>
             </div>
             <div class="instrument-summary"><span>当前表面</span><b data-instrument-output="material-profile">磨砂 / 100</b></div>
-            <label class="instrument-range"><span>粗糙度</span><output data-instrument-output="material-roughness">100</output><range-slider min="0" max="100" step="1" value="100" data-instrument-control data-instrument-key="material.roughness" aria-label="粗糙度"></range-slider></label>
-            <label class="instrument-range"><span>高光</span><output data-instrument-output="material-gloss">0</output><range-slider min="0" max="100" step="1" value="0" data-instrument-control data-instrument-key="material.gloss" aria-label="高光"></range-slider></label>
-            <label class="instrument-range"><span>柔软度</span><output data-instrument-output="material-softness">0</output><range-slider min="0" max="100" step="1" value="0" data-instrument-control data-instrument-key="material.softness" aria-label="柔软形变"></range-slider></label>
+            <label class="instrument-range"><span>粗糙度</span><output data-instrument-output="material-roughness">100</output><input type="range" min="0" max="100" value="100" data-instrument-control data-instrument-key="material.roughness" aria-label="粗糙度" /></label>
+            <label class="instrument-range"><span>高光</span><output data-instrument-output="material-gloss">0</output><input type="range" min="0" max="100" value="0" data-instrument-control data-instrument-key="material.gloss" aria-label="高光" /></label>
+            <label class="instrument-range"><span>柔软度</span><output data-instrument-output="material-softness">0</output><input type="range" min="0" max="100" value="0" data-instrument-control data-instrument-key="material.softness" aria-label="柔软形变" /></label>
             <p class="instrument-foot">拖动数值，实时观察表面变化</p>
           </aside>
         </section>
@@ -96,9 +96,9 @@
           </div>
           <aside class="signal-console instrument-panel" data-instrument="signal" aria-label="整体信号控制">
             <p class="instrument-kicker">粒子响应</p>
-            <label class="instrument-range"><span>速度</span><output data-instrument-output="signal-speed">20</output><range-slider min="0" max="100" step="1" value="20" data-instrument-control data-instrument-key="signal.speed" aria-label="粒子速度"></range-slider></label>
-            <label class="instrument-range"><span>随机度</span><output data-instrument-output="signal-chaos">20</output><range-slider min="0" max="100" step="1" value="20" data-instrument-control data-instrument-key="signal.chaos" aria-label="粒子随机度"></range-slider></label>
-            <label class="instrument-range"><span>触感</span><output data-instrument-output="signal-touch">35</output><range-slider min="0" max="100" step="1" value="35" data-instrument-control data-instrument-key="signal.touch" aria-label="鼠标粒子交互"></range-slider></label>
+            <label class="instrument-range"><span>速度</span><output data-instrument-output="signal-speed">20</output><input type="range" min="0" max="100" value="20" data-instrument-control data-instrument-key="signal.speed" aria-label="粒子速度" /></label>
+            <label class="instrument-range"><span>随机度</span><output data-instrument-output="signal-chaos">20</output><input type="range" min="0" max="100" value="20" data-instrument-control data-instrument-key="signal.chaos" aria-label="粒子随机度" /></label>
+            <label class="instrument-range"><span>触感</span><output data-instrument-output="signal-touch">35</output><input type="range" min="0" max="100" value="35" data-instrument-control data-instrument-key="signal.touch" aria-label="鼠标粒子交互" /></label>
             <p class="instrument-foot">速度 / 随机度 / 指针场</p>
           </aside>
           <div class="signal-footer" data-magnetic data-trail-target><span>SCROLL TO ROTATE</span><span class="footer-rule"></span><span>NAIWA 2026</span></div>
