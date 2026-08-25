@@ -256,9 +256,9 @@ test('material controls initialize and reset as a fully rough, unglossed, rigid 
   const page = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const interactions = await readFile(new URL('../src/text-interactions.js', import.meta.url), 'utf8');
 
-  assert.match(page, /<input(?=[^>]*value="100")(?=[^>]*data-instrument-key="material\.roughness")/);
-  assert.match(page, /<input(?=[^>]*value="0")(?=[^>]*data-instrument-key="material\.gloss")/);
-  assert.match(page, /<input(?=[^>]*value="0")(?=[^>]*data-instrument-key="material\.softness")/);
+  assert.match(page, /<range-slider(?=[^>]*value="100")(?=[^>]*data-instrument-key="material\.roughness")/);
+  assert.match(page, /<range-slider(?=[^>]*value="0")(?=[^>]*data-instrument-key="material\.gloss")/);
+  assert.match(page, /<range-slider(?=[^>]*value="0")(?=[^>]*data-instrument-key="material\.softness")/);
   assert.match(interactions, /material: \{ roughness: 1, gloss: 0, softness: 0 \}/);
   assert.match(interactions, /state\.material = \{ roughness: 1, gloss: 0, softness: 0 \}/);
 });
@@ -350,7 +350,7 @@ test('material console is centered on the form title and gives each range a clea
   assert.match(page, /class="instrument-status"/);
   assert.match(page, /class="instrument-summary"/);
   assert.match(styles, /\.chapter-form \.material-console\s*\{[^}]*justify-self:\s*end[^}]*transform:\s*none/);
-  assert.match(styles, /\.instrument-range input\s*\{[^}]*--instrument-progress/);
+  assert.match(styles, /\.instrument-range range-slider\s*\{[^}]*--track-size/);
   assert.match(interactions, /control\.style\.setProperty\('--instrument-progress'/);
 });
 

@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "vite --configLoader runner",
+    "build": "vite build --configLoader runner",
     "test": "node --test tests/*.test.js",
     "preview": "vite preview"
   },
@@ -15,6 +15,7 @@
     "@fontsource/noto-serif-sc": "^5.2.8",
     "gsap": "^3.15.0",
     "ogl": "^1.0.11",
+    "range-slider-element": "^2.2.0",
     "three": "^0.180.0",
     "three-mesh-bvh": "^0.9.14",
     "vite": "^7.0.6"
