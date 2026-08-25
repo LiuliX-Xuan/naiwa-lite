@@ -10,6 +10,8 @@ const {
   getGroundPlaneY,
   getBurstProgressStep,
   getInteractionResponseStep,
+  getModelDragRotation,
+  getModelDragReturnStep,
   getMobileSceneComposition,
   getParticleColor,
   getParticleOffset,
@@ -18,6 +20,7 @@ const {
   getScrollSceneState,
   getScrollTransitionStep,
   getTunnelReleaseAmount,
+  getInstrumentSceneState,
   shouldRenderFormShadows,
   shouldUpdateParticlePointer
 } = modelEffects;
@@ -25,6 +28,43 @@ const {
 test('retired orbit field calculations are not retained in the model-effects API', () => {
   assert.equal('getFieldMotionState' in modelEffects, false);
   assert.equal('getReleaseCollapse' in modelEffects, false);
+});
+
+test('instrument state modulates the one-piece model without introducing horizontal translation', () => {
+  assert.equal(typeof getInstrumentSceneState, 'function');
+
+  const neutral = getInstrumentSceneState();
+  const stance = getInstrumentSceneState({ origin: 'stance' });
+  const expressive = getInstrumentSceneState({
+    origin: 'voice',
+    material: { roughness: 0.76, gloss: 0.8, softness: 0.7 },
+    signal: { speed: 0.8, chaos: 0.75, touch: 0.6 },
+    release: 'wide'
+  });
+  const matte = getInstrumentSceneState({ material: { roughness: 1, gloss: 0 } });
+  const polished = getInstrumentSceneState({ material: { roughness: 0, gloss: 1 } });
+
+  assert.equal(neutral.model.x, 0);
+  assert.equal(neutral.model.yaw, 0);
+  assert.equal(neutral.surface.roughness, 1);
+  assert.equal(neutral.surface.glossLevel, 0);
+  assert.equal(neutral.surface.distortion, 0);
+  assert.equal(stance.model.x, 0);
+  assert.notEqual(stance.model.yaw, 0);
+  assert.notEqual(stance.light.x, 0);
+  assert.ok(expressive.surface.roughnessShift > 0);
+  assert.ok(expressive.surface.gloss > 0);
+  assert.equal(matte.surface.roughness, 1);
+  assert.equal(matte.surface.glossLevel, 0);
+  assert.equal(polished.surface.roughness, 0);
+  assert.equal(polished.surface.glossLevel, 1);
+  assert.ok(expressive.surface.distortion > 0);
+  assert.ok(expressive.particles.vibration > 0.2);
+  assert.equal(expressive.particles.speed, 0.8);
+  assert.equal(expressive.particles.randomness, 0.75);
+  assert.equal(expressive.particles.interaction, 0.6);
+  assert.ok(expressive.particles.previewOpacity > 0.1);
+  assert.ok(expressive.typography.signal > 0.25);
 });
 
 test('Three scene consumes the spectacle state instead of the retired orbit field', async () => {
@@ -35,6 +75,12 @@ test('Three scene consumes the spectacle state instead of the retired orbit fiel
   assert.doesNotMatch(entry, /const scrollState = getScrollSceneState\(targetScroll\)/);
   assert.doesNotMatch(entry, /createInteractionField/);
   assert.match(entry, /--grid-opacity/);
+  assert.match(entry, /surfaceRoughness: next\.surface\.roughness/);
+  assert.match(entry, /surfaceGloss: next\.surface\.glossLevel/);
+  assert.match(entry, /material\.shininess/);
+  assert.match(entry, /material\.specular/);
+  assert.match(entry, /Math\.pow\(surfaceGloss, 1\.5\)/);
+  assert.match(entry, /Math\.pow\(1 - surfaceRoughness, 1\.65\)/);
 });
 
 test('particle shader exposes local distortion and tunnel controls', async () => {
@@ -45,11 +91,11 @@ test('particle shader exposes local distortion and tunnel controls', async () =>
   assert.match(entry, /tunnelDirection/);
 });
 
-test('model hit state promotes the shared fluid trail', async () => {
+test('model hit state does not promote a cursor ring overlay', async () => {
   const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
 
-  assert.match(entry, /is-model-active/);
-  assert.match(entry, /fluidTrail/);
+  assert.doesNotMatch(entry, /is-model-active/);
+  assert.doesNotMatch(entry, /fluidTrail/);
 });
 
 test('particle palette keeps dark and green texture accents', () => {
@@ -83,7 +129,9 @@ test('particle release uses the earlier wide burst profile while keeping gentle 
 
   assert.match(entry, /uTunnel \* \(1\.24 \+ aScale \* 0\.42\) \* releaseSettle/);
   assert.match(entry, /aBurst \* \(4\.7 \* burstRelease\)/);
-  assert.match(entry, /uTime \* 0\.00055/);
+  assert.match(entry, /float signalTime = uTime \* \(1\.0 \+ uParticleSpeed \* 8\.5\)/);
+  assert.match(entry, /float speedFlow = sin\(aPhase \* 3\.7 \+ signalTime \* 0\.0018\)/);
+  assert.match(entry, /signalTime \* 0\.00055/);
   assert.match(entry, /uTime \* 0\.00085/);
 });
 
@@ -169,14 +217,16 @@ test('pointer mapping keeps screen-up aligned with raycasting-up', () => {
   assert.equal(bottom.y, -1);
 });
 
-test('scroll state keeps the particle field active and rotates through release', () => {
-  const before = getScrollSceneState(0.1);
-  const morph = getScrollSceneState(0.62);
+test('scroll state completes the entity-to-particle handoff inside the origin chapter', () => {
+  const before = getScrollSceneState(0.15);
+  const morph = getScrollSceneState(0.3);
+  const material = getScrollSceneState(0.42);
   const release = getScrollSceneState(0.76);
   const end = getScrollSceneState(1);
 
   assert.equal(before.morph, 0);
-  assert.ok(morph.morph > 0.9);
+  assert.ok(morph.morph > 0.4);
+  assert.equal(material.morph, 1);
   assert.equal(release.morph, 1);
   assert.ok(release.field > 0.9);
   assert.equal(end.morph, 1);
@@ -186,6 +236,42 @@ test('scroll state keeps the particle field active and rotates through release',
   assert.ok(end.rotation > morph.rotation);
   assert.ok(release.rotation > Math.PI * 2);
   assert.ok(end.rotation > release.rotation);
+});
+
+test('manual model drag holds while pressed and returns smoothly after release', () => {
+  assert.equal(typeof getModelDragReturnStep, 'function');
+
+  const held = getModelDragReturnStep({ current: 0.46, dragging: true, deltaSeconds: 0.5 });
+  const released = getModelDragReturnStep({ current: 0.46, dragging: false, deltaSeconds: 0.16 });
+
+  assert.equal(held, 0.46);
+  assert.ok(released > 0);
+  assert.ok(released < 0.46);
+});
+
+test('manual model drag permits a full horizontal rotation while keeping vertical movement stable', () => {
+  assert.equal(typeof getModelDragRotation, 'function');
+
+  const rotated = getModelDragRotation({
+    yaw: 0,
+    pitch: 0,
+    deltaX: 700,
+    deltaY: 900
+  });
+
+  assert.ok(rotated.yaw > Math.PI * 2);
+  assert.equal(rotated.pitch, Math.PI * 0.72);
+});
+
+test('Three scene composes a temporary drag rotation without changing the scroll rotation', async () => {
+  const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+
+  assert.match(entry, /getModelDragReturnStep/);
+  assert.match(entry, /const modelDrag =/);
+  assert.match(entry, /event\.button !== 0/);
+  assert.match(entry, /assetRoot\.rotation\.y = smoothRotation \+ instrumentMotion\.modelYaw \+ modelDrag\.yaw/);
+  assert.match(entry, /assetRoot\.rotation\.x[\s\S]*modelDrag\.pitch/);
+  assert.match(entry, /document\.documentElement\.classList\.add\('is-model-dragging'\)/);
 });
 
 test('tunnel movement yields to the burst intent before lateral release drift can build', async () => {

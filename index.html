@@ -24,8 +24,6 @@
         <div class="grain"></div>
       </div>
 
-      <div class="fluid-trail" aria-hidden="true"></div>
-
       <header class="site-header">
         <a class="brand" href="#top" aria-label="回到顶部" data-magnetic data-trail-target>
           <span class="brand-mark">N</span>
@@ -61,43 +59,48 @@
             <h2 class="chapter-title"><span class="type-line"><span data-elastic-text data-follow="7" data-trail-target>产品原型：</span></span><span class="type-line type-line-accent"><span><em data-elastic-text data-follow="8" data-trail-target>一只被保留的</em></span></span><span class="type-line type-line-final"><span><em data-elastic-text data-follow="7" data-trail-target>生成误差。</em></span></span></h2>
             <p class="chapter-copy" data-reading-sweep data-trail-target>在这份角色档案里，它来自一次 AI 动作生成的偶然崩坏：淡黄软壳承接拳法般的姿态，颈部消失，躯干在比例失衡中膨胀成圆胖而沉默的轮廓。</p>
             <div class="chapter-index" data-magnetic data-trail-target>ORIGIN FRAGMENT <span>03 PARTS</span></div>
-            <div class="origin-traits" aria-label="角色组成">
-              <button class="origin-trait is-active" type="button" data-origin-tab="shell" data-magnetic data-trail-target><span>壳</span><b>SOFT SHELL</b><em>淡黄色软躯干</em></button>
-              <button class="origin-trait" type="button" data-origin-tab="stance" data-magnetic data-trail-target><span>势</span><b>LOCKED POSE</b><em>拳法般的姿态</em></button>
-              <button class="origin-trait" type="button" data-origin-tab="voice" data-magnetic data-trail-target><span>声</span><b>STRETCHED LAUGH</b><em>被拉伸的狂笑</em></button>
+            <div class="origin-traits instrument-segments" data-instrument="origin" role="group" aria-label="角色整体控制">
+              <button class="origin-trait is-active" type="button" data-instrument-control data-instrument-key="origin" data-instrument-value="shell"><span>壳</span><b>柔软外壳</b><em>淡黄色软躯干</em></button>
+              <button class="origin-trait" type="button" data-instrument-control data-instrument-key="origin" data-instrument-value="stance"><span>势</span><b>中轴姿态</b><em>中轴微倾与光向</em></button>
+              <button class="origin-trait" type="button" data-instrument-control data-instrument-key="origin" data-instrument-value="voice"><span>声</span><b>延展笑声</b><em>粒子与文字余震</em></button>
             </div>
           </div>
-          <aside class="origin-profile" aria-label="角色资料模块">
-            <p class="origin-profile-kicker">SPECIMEN / 02</p>
-            <div class="origin-profile-tabs" role="tablist" aria-label="角色资料维度">
-              <button class="origin-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="origin-profile-detail" data-origin-tab="shell" data-origin-title="SOFT SHELL" data-origin-detail="淡黄色软躯干，将重心压在圆胖的体积里。" data-magnetic data-trail-target><span>01</span><b>壳</b><i>BODY</i></button>
-              <button class="origin-tab" type="button" role="tab" aria-selected="false" aria-controls="origin-profile-detail" data-origin-tab="stance" data-origin-title="LOCKED POSE" data-origin-detail="拳法般的姿态被停在生成失误的中间帧。" data-magnetic data-trail-target><span>02</span><b>势</b><i>STANCE</i></button>
-              <button class="origin-tab" type="button" role="tab" aria-selected="false" aria-controls="origin-profile-detail" data-origin-tab="voice" data-origin-title="STRETCHED LAUGH" data-origin-detail="被拉伸的狂笑没有声音，只留下轮廓的余震。" data-magnetic data-trail-target><span>03</span><b>声</b><i>VOICE</i></button>
+          <aside class="material-console instrument-panel" data-instrument="material" aria-label="材质控制">
+            <div class="instrument-head">
+              <div><p class="instrument-kicker">表面 / 03</p><p class="instrument-caption">整体材质控制</p></div>
+              <span class="instrument-status"><i aria-hidden="true"></i>实时同步</span>
             </div>
-            <div class="origin-profile-detail" id="origin-profile-detail" aria-live="polite" data-trail-target>
-              <strong>SOFT SHELL</strong>
-              <p>淡黄色软躯干，将重心压在圆胖的体积里。</p>
-            </div>
+            <div class="instrument-summary"><span>当前表面</span><b data-instrument-output="material-profile">磨砂 / 100</b></div>
+            <label class="instrument-range"><span>粗糙度</span><output data-instrument-output="material-roughness">100</output><input type="range" min="0" max="100" value="100" data-instrument-control data-instrument-key="material.roughness" aria-label="粗糙度" /></label>
+            <label class="instrument-range"><span>高光</span><output data-instrument-output="material-gloss">0</output><input type="range" min="0" max="100" value="0" data-instrument-control data-instrument-key="material.gloss" aria-label="高光" /></label>
+            <label class="instrument-range"><span>柔软度</span><output data-instrument-output="material-softness">0</output><input type="range" min="0" max="100" value="0" data-instrument-control data-instrument-key="material.softness" aria-label="柔软形变" /></label>
+            <p class="instrument-foot">拖动数值，实时观察表面变化</p>
           </aside>
         </section>
 
         <section id="material" class="story-section chapter chapter-material" data-scene="material" data-display="SOFT">
-          <div class="material-orbit" data-magnetic data-trail-target><span class="orbit-dot"></span><span class="orbit-label">MATERIAL / 01</span></div>
           <div class="chapter-inner align-right">
             <p class="eyebrow"><span>03</span> SURFACE LANGUAGE</p>
             <h2 class="chapter-title"><span class="type-line"><span data-elastic-text data-follow="7" data-trail-target>形态参数：</span></span><span class="type-line type-line-accent"><span><em data-elastic-text data-follow="8" data-trail-target>软胶、圆体、</em></span></span><span class="type-line type-line-final"><span><em data-elastic-text data-follow="7" data-trail-target>无颈。</em></span></span></h2>
             <p class="chapter-copy" data-reading-sweep data-trail-target>通体是柔和淡黄色，像被轻轻捏出的黏土玩偶。没有明显脖子，巨大的躯干接住短小四肢，高光只在圆弧上缓慢移动。</p>
-            <div class="material-specs" data-magnetic data-trail-target><span>SURFACE <b>SOFT VINYL</b></span><span>BODY <b>NO NECK</b></span><span>VOLUME <b>ROUND</b></span></div>
+            <div class="material-specs" data-magnetic data-trail-target><span>SURFACE <b>SOFT VINYL</b></span><span>BODY <b>ONE PIECE</b></span><span>VOLUME <b>ROUND</b></span></div>
           </div>
         </section>
 
         <section id="signal" class="story-section chapter chapter-signal" data-scene="signal" data-display="STILL">
           <div class="chapter-inner">
-            <p class="eyebrow"><span>04</span> FACIAL SIGNAL</p>
+            <p class="eyebrow"><span>04</span> WHOLE-FORM SIGNAL</p>
             <h2 class="chapter-title"><span class="type-line"><span data-elastic-text data-follow="7" data-trail-target>视觉识别：</span></span><span class="type-line type-line-accent"><span><em data-elastic-text data-follow="8" data-trail-target>巨眼与</em></span></span><span class="type-line type-line-final"><span><em data-elastic-text data-follow="7" data-trail-target>静默表情。</em></span></span></h2>
             <p class="chapter-copy" data-reading-sweep data-trail-target>浅绿色眼白包住纯黑瞳孔，像两枚迟钝的信号灯；嘴巴只剩一条细横线，冷淡得几乎没有情绪。形体进入粒子后，这些颜色仍被保留。</p>
-            <div class="signal-readout" data-magnetic data-trail-target><span>EYE RING / PUPIL</span><strong>STILL</strong></div>
+            <div class="signal-readout" data-magnetic data-trail-target><span>实时粒子场</span><strong><b data-instrument-output="signal-speed">20</b> 速度</strong></div>
           </div>
+          <aside class="signal-console instrument-panel" data-instrument="signal" aria-label="整体信号控制">
+            <p class="instrument-kicker">粒子响应</p>
+            <label class="instrument-range"><span>速度</span><output data-instrument-output="signal-speed">20</output><input type="range" min="0" max="100" value="20" data-instrument-control data-instrument-key="signal.speed" aria-label="粒子速度" /></label>
+            <label class="instrument-range"><span>随机度</span><output data-instrument-output="signal-chaos">20</output><input type="range" min="0" max="100" value="20" data-instrument-control data-instrument-key="signal.chaos" aria-label="粒子随机度" /></label>
+            <label class="instrument-range"><span>触感</span><output data-instrument-output="signal-touch">35</output><input type="range" min="0" max="100" value="35" data-instrument-control data-instrument-key="signal.touch" aria-label="鼠标粒子交互" /></label>
+            <p class="instrument-foot">速度 / 随机度 / 指针场</p>
+          </aside>
           <div class="signal-footer" data-magnetic data-trail-target><span>SCROLL TO ROTATE</span><span class="footer-rule"></span><span>NAIWA 2026</span></div>
         </section>
 
@@ -106,14 +109,27 @@
             <p class="eyebrow"><span>05</span> THREE PARTS, ONE SHAPE</p>
             <h2 class="chapter-title"><span class="type-line"><span data-elastic-text data-follow="7" data-trail-target>交互任务：</span></span><span class="type-line type-line-accent"><span><em data-elastic-text data-follow="8" data-trail-target>从实体释放至</em></span></span><span class="type-line type-line-final"><span><em data-elastic-text data-follow="7" data-trail-target>粒子场。</em></span></span></h2>
             <p class="chapter-copy" data-reading-sweep data-trail-target>淡黄身体、魔性的动作和被变调的笑声，在一次生成失真里被缝成同一个角色。向下滚动，它会从一具形体散成满屏的记忆碎片。</p>
-            <div class="release-readout" data-magnetic data-trail-target><span>SHELL / GESTURE / LAUGH</span><strong>REASSEMBLED</strong></div>
+            <div class="release-readout" data-magnetic data-trail-target><span>外壳 / 姿态 / 笑声</span><strong data-instrument-output="release-state">保持</strong></div>
           </div>
+          <aside class="release-console instrument-panel" data-instrument="release" aria-label="释放预览控制">
+            <p class="instrument-kicker">释放预览</p>
+            <div class="instrument-choices" role="group" aria-label="释放预览强度">
+              <button class="instrument-choice is-active" type="button" data-instrument-control data-instrument-key="release" data-instrument-value="hold">保持</button>
+              <button class="instrument-choice" type="button" data-instrument-control data-instrument-key="release" data-instrument-value="trace">轨迹</button>
+              <button class="instrument-choice" type="button" data-instrument-control data-instrument-key="release" data-instrument-value="wide">扩散</button>
+            </div>
+            <p class="instrument-foot">仅预览 / 滚动释放</p>
+          </aside>
           <div class="release-notes" aria-label="形体观察" data-magnetic data-trail-target>
             <p><span>01</span>外壳：淡黄软躯干。</p>
             <p><span>02</span>姿态：拳法般的失衡。</p>
             <p><span>03</span>声场：一阵被拉伸的笑。</p>
           </div>
           <div class="release-footer" data-magnetic data-trail-target><span>NAIWA / SPECIMEN 01</span><span>2026</span><span>ENDLESS SOFTNESS</span></div>
+          <div class="terminal-mark" aria-hidden="true">
+            <span class="terminal-kicker">END STATE / 01</span>
+            <div class="terminal-warp" data-terminal-wordmark data-terminal-text="奶蛙"><strong class="terminal-fallback">奶蛙</strong></div>
+          </div>
         </section>
       </main>
 

@@ -104,10 +104,84 @@ export function getScrollTransitionStep({ current = 0, target = 0, deltaSeconds 
   return current + (target - current) * response;
 }
 
+export function getModelDragReturnStep({ current = 0, dragging = false, deltaSeconds = 0, rate = 2.4 } = {}) {
+  if (dragging) return current;
+  return getScrollTransitionStep({ current, target: 0, deltaSeconds, rate });
+}
+
+export function getModelDragRotation({ yaw = 0, pitch = 0, deltaX = 0, deltaY = 0 } = {}) {
+  return {
+    yaw: Number(yaw) + Number(deltaX) * 0.01,
+    pitch: clamp(Number(pitch) + Number(deltaY) * 0.006, -Math.PI * 0.72, Math.PI * 0.72)
+  };
+}
+
 export function getTunnelReleaseAmount({ tunnel = 0, burstIntent = 0 } = {}) {
   const tunnelAmount = clamp(tunnel, 0, 1);
   const release = smoothstep(0, 0.24, clamp(burstIntent, 0, 1));
   return tunnelAmount * (1 - release);
+}
+
+export function getInstrumentSceneState({
+  origin = 'neutral',
+  material = {},
+  signal = { speed: 0.2, chaos: 0.2, touch: 0.35 },
+  release = 'hold'
+} = {}) {
+  const roughness = clamp(Number(material.roughness ?? 1), 0, 1);
+  const gloss = clamp(Number(material.gloss ?? 0), 0, 1);
+  const softness = clamp(Number(material.softness ?? 0), 0, 1);
+  const legacySignal = typeof signal === 'string' ? signal : undefined;
+  const speed = clamp(Number(legacySignal === 'flow' ? 0.45 : legacySignal === 'pulse' ? 0.82 : signal.speed ?? 0.2), 0, 1);
+  const chaos = clamp(Number(legacySignal === 'flow' ? 0.42 : legacySignal === 'pulse' ? 0.76 : signal.chaos ?? 0.2), 0, 1);
+  const touch = clamp(Number(legacySignal === 'flow' ? 0.5 : legacySignal === 'pulse' ? 0.82 : signal.touch ?? 0.35), 0, 1);
+  const state = {
+    model: { x: 0, pitch: 0, yaw: 0, roll: 0, warmth: 0, breath: 0 },
+    light: { x: 0, y: 0, intensity: 0, warmth: 0 },
+    surface: {
+      roughness,
+      glossLevel: gloss,
+      roughnessShift: (roughness - 0.5) * 0.52,
+      gloss: (gloss - 0.5) * 0.46,
+      distortion: Math.max(0, softness - 0.5) * 0.44
+    },
+    particles: { vibration: 0, speed, randomness: chaos, interaction: touch, previewOpacity: 0, previewSize: 0 },
+    typography: { signal: 0 }
+  };
+
+  if (origin === 'shell') {
+    state.model.warmth = 0.12;
+    state.model.breath = 0.1;
+    state.surface.gloss += 0.18;
+    state.surface.glossLevel = Math.min(1, state.surface.glossLevel + 0.18);
+  }
+  if (origin === 'stance') {
+    state.model.pitch = 0.026;
+    state.model.yaw = -0.08;
+    state.model.roll = 0.018;
+    state.light.x = -0.9;
+    state.light.y = 0.34;
+    state.light.intensity = 0.14;
+  }
+  if (origin === 'voice') {
+    state.particles.vibration += 0.14;
+    state.typography.signal += 0.2;
+  }
+
+  state.model.breath += speed * 0.05;
+  state.particles.vibration += chaos * 0.3;
+  state.typography.signal += Math.max(speed, chaos) * 0.32;
+
+  if (release === 'trace') {
+    state.particles.previewOpacity = 0.08;
+    state.particles.previewSize = 0.07;
+  }
+  if (release === 'wide') {
+    state.particles.previewOpacity = 0.16;
+    state.particles.previewSize = 0.14;
+  }
+
+  return state;
 }
 
 export function getParticleOffset(home, pointer, time, index, out = { x: 0, y: 0, z: 0 }) {
@@ -128,7 +202,7 @@ export function getParticleOffset(home, pointer, time, index, out = { x: 0, y: 0
 export function getScrollSceneState(progress) {
   const normalized = clamp(progress, 0, 1);
   return {
-    morph: smoothstep(0.24, 0.58, normalized),
+    morph: smoothstep(0.16, 0.4, normalized),
     field: smoothstep(0.55, 0.7, normalized),
     burst: smoothstep(0.76, 0.98, normalized),
     rotation: normalized * Math.PI * 3.8,

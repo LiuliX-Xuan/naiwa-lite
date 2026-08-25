@@ -13,7 +13,10 @@ import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js';
 import {
   getGroundPlaneY,
   getBurstProgressStep,
+  getInstrumentSceneState,
   getInteractionResponseStep,
+  getModelDragRotation,
+  getModelDragReturnStep,
   getMobileSceneComposition,
   getParticleColor,
   getPointerNdc,
@@ -28,13 +31,12 @@ import {
 import { getSpectacleScrollState } from './interactive-effects.js';
 import { enableMeshRaycastAcceleration } from './mesh-raycast.js';
 import { mountMotionEffects } from './motion-effects.js';
-import { mountOriginComponents, mountPointerResponses, mountTextInteractions } from './text-interactions.js';
+import { mountInstrumentControls, mountReadingResponses, mountTextInteractions } from './text-interactions.js';
 import './styles.css';
 
 const canvas = document.querySelector('#scene');
 const loading = document.querySelector('#loading');
 const stateLabel = document.querySelector('#state-label');
-const fluidTrail = document.querySelector('.fluid-trail');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(getRenderPixelRatio(window.devicePixelRatio, window.innerWidth));
@@ -96,6 +98,7 @@ controls.minPolarAngle = Math.PI * 0.33;
 controls.maxPolarAngle = Math.PI * 0.66;
 controls.target.set(0, -0.2, 0);
 controls.autoRotate = false;
+controls.enableRotate = false;
 
 let model;
 let particleSystem;
@@ -129,11 +132,47 @@ const particlePointerTarget = new THREE.Vector3();
 const previousParticlePointer = new THREE.Vector3();
 const particlePointerMotion = new THREE.Vector3();
 let hasParticlePointer = false;
+const modelDrag = {
+  yaw: 0,
+  pitch: 0,
+  isDragging: false,
+  pointerId: null,
+  lastX: 0,
+  lastY: 0
+};
 let motionEffects;
 let modelReady = false;
 let loadFailed = false;
 let modelIntroStarted = false;
 let modelIntroTimeline;
+let instrumentControls;
+let applicationVisible = false;
+const instrumentMotion = {
+  modelPitch: 0,
+  modelYaw: 0,
+  modelRoll: 0,
+  modelWarmth: 0,
+  modelBreath: 0,
+  lightX: 0,
+  lightY: 0,
+  lightIntensity: 0,
+  lightWarmth: 0,
+  surfaceRoughness: 1,
+  surfaceGloss: 0,
+  surfaceDistortion: 0,
+  particleVibration: 0,
+  particleSpeed: 0,
+  particleRandomness: 0,
+  particleInteraction: 0,
+  previewOpacity: 0,
+  previewSize: 0,
+  typographySignal: 0
+};
+const baseKeyLight = { x: 4, y: 6, z: 6, intensity: 3.5 };
+const baseKeyLightColor = new THREE.Color(0xfff3cf);
+const warmKeyLightColor = new THREE.Color(0xffdd7b);
+const warmMaterialTint = new THREE.Color(0xffe47b);
+const polishedSpecular = new THREE.Color(0xfff4bf);
 const modelEntrance = {
   opacity: 0,
   scale: 0.82,
@@ -142,6 +181,34 @@ const modelEntrance = {
   tilt: 0.1,
   roll: -0.05
 };
+
+function setInstrumentState(state) {
+  const next = getInstrumentSceneState(state);
+  gsap.to(instrumentMotion, {
+    modelPitch: next.model.pitch,
+    modelYaw: next.model.yaw,
+    modelRoll: next.model.roll,
+    modelWarmth: next.model.warmth,
+    modelBreath: next.model.breath,
+    lightX: next.light.x,
+    lightY: next.light.y,
+    lightIntensity: next.light.intensity,
+    lightWarmth: next.light.warmth,
+    surfaceRoughness: next.surface.roughness,
+    surfaceGloss: next.surface.glossLevel,
+    surfaceDistortion: next.surface.distortion,
+    particleVibration: next.particles.vibration,
+    particleSpeed: next.particles.speed,
+    particleRandomness: next.particles.randomness,
+    particleInteraction: next.particles.interaction,
+    previewOpacity: next.particles.previewOpacity,
+    previewSize: next.particles.previewSize,
+    typographySignal: next.typography.signal,
+    duration: 0.72,
+    ease: 'power3.out',
+    overwrite: 'auto'
+  });
+}
 
 function playModelIntro() {
   if (!model) return;
@@ -176,7 +243,7 @@ function playModelIntro() {
 }
 
 function syncIntroState() {
-  if (!motionEffects) return;
+  if (!motionEffects || !applicationVisible) return;
   if (loadFailed) {
     motionEffects.revealFallback();
     return;
@@ -231,6 +298,10 @@ function normalizeModel(root) {
       if (!material) return;
       material.transparent = true;
       material.userData.baseOpacity = material.opacity ?? 1;
+      material.userData.baseRoughness = material.roughness ?? 0.64;
+      material.userData.baseMetalness = material.metalness ?? 0.02;
+      material.userData.baseShininess = material.shininess ?? 30;
+      material.userData.baseSpecular = material.specular?.clone?.() ?? new THREE.Color(0x1c180a);
       material.userData.dissolve = 0;
       material.userData.surfaceDistortion = 0;
       material.alphaMap = null;
@@ -238,14 +309,15 @@ function normalizeModel(root) {
       material.side = THREE.DoubleSide;
       if (material.emissive) material.emissive.set(0x000000);
       if ('emissiveMap' in material) material.emissiveMap = null;
-      material.roughness = material.roughness ?? 0.64;
-      material.metalness = material.metalness ?? 0.02;
+      if ('roughness' in material) material.roughness = material.roughness ?? 0.64;
+      if ('metalness' in material) material.metalness = material.metalness ?? 0.02;
       material.vertexColors = false;
       if (material.map) {
         material.color.set(0xffffff);
       } else {
         material.color.set(0xf3d861);
       }
+      material.userData.baseColor = material.color.clone();
       material.onBeforeCompile = (shader) => {
         shader.uniforms.uDissolve = { value: material.userData.dissolve };
         shader.uniforms.uSurfaceDistortion = { value: material.userData.surfaceDistortion };
@@ -461,6 +533,11 @@ function buildParticles(root) {
       uBurst: { value: 0 },
       uDistortion: { value: 0 },
       uTunnel: { value: 0 },
+      uInstrumentVibration: { value: 0 },
+      uParticleSpeed: { value: 0 },
+      uParticleRandomness: { value: 0 },
+      uParticleInteraction: { value: 0 },
+      uPreviewSize: { value: 0 },
       uParticleCenter: { value: particleCenter },
       uTime: { value: 0 },
       uPointer: { value: new THREE.Vector3() },
@@ -480,6 +557,11 @@ function buildParticles(root) {
       uniform float uBurst;
       uniform float uDistortion;
       uniform float uTunnel;
+      uniform float uInstrumentVibration;
+      uniform float uParticleSpeed;
+      uniform float uParticleRandomness;
+      uniform float uParticleInteraction;
+      uniform float uPreviewSize;
       uniform vec3 uParticleCenter;
       uniform float uTime;
       uniform vec3 uPointer;
@@ -489,32 +571,40 @@ function buildParticles(root) {
         vColor = color;
         float entered = smoothstep(0.0, 0.68, uTransition);
         float splash = sin(clamp(uTransition, 0.0, 1.0) * 3.14159265);
-        float breath = sin(aPhase + uTime * 0.00055) * 0.009 * entered;
+        float signalTime = uTime * (1.0 + uParticleSpeed * 8.5);
+        float breath = sin(aPhase + signalTime * 0.00055) * 0.009 * entered;
+        float speedFlow = sin(aPhase * 3.7 + signalTime * 0.0018);
         float burst = smoothstep(0.0, 1.0, uBurst);
         float burstRelease = burst;
         float releaseSettle = 1.0 - smoothstep(0.0, 0.24, burstRelease);
         vec3 splatPosition = position;
         splatPosition += aDrift * (0.035 + splash * 1.34) * releaseSettle;
         splatPosition += aNormal * (0.016 + splash * 0.12 + breath) * releaseSettle;
+        float chaosWave = sin(aPhase * 6.0 + signalTime * 0.00135) * uParticleRandomness;
+        splatPosition += aDrift * chaosWave * 0.34 * entered * (1.0 - burst) * releaseSettle;
+        splatPosition += aNormal * chaosWave * 0.038 * entered * (1.0 - burst) * releaseSettle;
+        splatPosition += aDrift * speedFlow * 0.09 * uParticleSpeed * entered * (1.0 - burst) * releaseSettle;
         vec3 interactionVector = position - uPointer;
         float interactionDistance = max(length(interactionVector), 0.0001);
         float interactionInfluence = exp(-interactionDistance * interactionDistance * 2.2);
-        float ripple = sin(interactionDistance * 14.0 - uTime * 0.008 + aPhase * 1.7) * 0.5 + 0.5;
-        float interactionStrength = interactionInfluence * (0.14 + ripple * 0.095) * uPointerActive;
+        float ripple = sin(interactionDistance * 14.0 - signalTime * 0.008 + aPhase * 1.7) * 0.5 + 0.5;
+        float interactionStrength = interactionInfluence * (0.14 + ripple * 0.095) * uPointerActive * uParticleInteraction;
         vec3 radialDirection = interactionVector / interactionDistance;
         vec3 swirlAxis = normalize(aNormal + vec3(0.0001, 0.0, 0.0));
         vec3 tangentDirection = cross(swirlAxis, radialDirection);
         tangentDirection /= max(length(tangentDirection), 0.0001);
         float pointerSpeed = clamp(length(uPointerMotion) * 4.6, 0.0, 1.0);
-        float swirlStrength = interactionInfluence * (0.028 + pointerSpeed * 0.12 + ripple * 0.028) * uPointerActive;
+        float swirlStrength = interactionInfluence * (0.028 + pointerSpeed * 0.12 + ripple * 0.028) * uPointerActive * uParticleInteraction;
         vec3 microDirection = normalize(aDrift + aNormal * 0.42 + vec3(sin(aPhase * 7.0), cos(aPhase * 5.0), sin(aPhase * 3.0)) * 0.08);
         vec3 interactionDirection = normalize(radialDirection * 0.72 + aNormal * 0.22 + microDirection * 0.16);
         splatPosition += interactionDirection * interactionStrength * uTransition * (1.0 - burst) * releaseSettle;
         splatPosition += tangentDirection * swirlStrength * uTransition * (1.0 - burst) * releaseSettle;
-        splatPosition += aDrift * interactionInfluence * (0.012 + ripple * 0.04) * uPointerActive * uTransition * (1.0 - burst) * releaseSettle;
-        splatPosition.y += sin(uTime * 0.0012 + aPhase * 11.0) * 0.008 * interactionInfluence * uPointerActive * uTransition * (1.0 - burst) * releaseSettle;
+        splatPosition += aDrift * interactionInfluence * (0.012 + ripple * 0.04) * uPointerActive * uParticleInteraction * uTransition * (1.0 - burst) * releaseSettle;
+        splatPosition.y += sin(signalTime * 0.0012 + aPhase * 11.0) * 0.008 * interactionInfluence * uPointerActive * uParticleInteraction * uTransition * (1.0 - burst) * releaseSettle;
         float distortionWave = sin((position.y + position.x * 0.62 + uTime * 0.00085) * 12.0 + aPhase) * uDistortion;
         splatPosition += aNormal * distortionWave * 0.085 * releaseSettle;
+        float instrumentWave = sin(aPhase * 5.0 + signalTime * 0.0011) * uInstrumentVibration;
+        splatPosition += aNormal * instrumentWave * 0.032 * entered * (1.0 - burst) * releaseSettle;
         vec3 tunnelDirection = normalize(vec3(splatPosition.xy * 0.28 + aDrift.xy * 0.12, 1.0));
         splatPosition += tunnelDirection * uTunnel * (1.24 + aScale * 0.42) * releaseSettle;
         splatPosition += aBurst * (4.7 * burstRelease);
@@ -525,9 +615,9 @@ function buildParticles(root) {
         splatPosition += centeredSwirl * (releaseSwirl * 0.035);
         splatPosition -= uParticleCenter * entered;
         vec4 viewPosition = modelViewMatrix * vec4(splatPosition, 1.0);
-        float pulse = 1.0 + sin(uTime * 0.00055 + aPhase) * 0.045 * uTransition;
+        float pulse = 1.0 + sin(signalTime * 0.00055 + aPhase) * 0.045 * uTransition;
         float releasePulse = 1.0 + sin(uTime * 0.00135) * 0.055 * burstRelease;
-        gl_PointSize = uSize * aScale * (300.0 / max(1.0, -viewPosition.z)) * mix(0.16, 1.0, entered) * mix(1.0, 1.18, burstRelease) * pulse * releasePulse;
+        gl_PointSize = uSize * aScale * (300.0 / max(1.0, -viewPosition.z)) * mix(0.16, 1.0, entered) * mix(1.0, 1.18, burstRelease) * pulse * releasePulse * (1.0 + uPreviewSize * (1.0 - burst));
         gl_Position = projectionMatrix * viewPosition;
       }
     `,
@@ -558,6 +648,11 @@ function buildParticles(root) {
 
 function setModelState(opacity, dissolve, surfaceDistortion = 0) {
   if (!model) return;
+  const surfaceRoughness = THREE.MathUtils.clamp(instrumentMotion.surfaceRoughness, 0, 1);
+  const surfaceGloss = THREE.MathUtils.clamp(instrumentMotion.surfaceGloss, 0, 1);
+  const glossResponse = Math.pow(surfaceGloss, 1.5);
+  const roughnessResponse = Math.pow(1 - surfaceRoughness, 1.65);
+  const phongShininess = 4 + roughnessResponse * (10 + glossResponse * 172);
   model.traverse((child) => {
     if (!child.isMesh) return;
     const materials = Array.isArray(child.material) ? child.material : [child.material];
@@ -565,6 +660,16 @@ function setModelState(opacity, dissolve, surfaceDistortion = 0) {
       if (!material) return;
       material.opacity = (material.userData.baseOpacity ?? 1) * opacity;
       material.depthWrite = dissolve < 0.03;
+      if ('roughness' in material) material.roughness = THREE.MathUtils.lerp(0.08, 0.96, surfaceRoughness);
+      if ('metalness' in material) material.metalness = THREE.MathUtils.clamp((material.userData.baseMetalness ?? 0.02) + glossResponse * 0.34, 0, 0.5);
+      if ('shininess' in material) material.shininess = phongShininess;
+      if (material.specular && material.userData.baseSpecular) {
+        material.specular.copy(material.userData.baseSpecular).lerp(polishedSpecular, glossResponse);
+      }
+      if ('reflectivity' in material) material.reflectivity = THREE.MathUtils.lerp(0.08, 0.9, glossResponse);
+      if (material.color && material.userData.baseColor) {
+        material.color.copy(material.userData.baseColor).lerp(warmMaterialTint, instrumentMotion.modelWarmth);
+      }
       material.userData.dissolve = dissolve;
       material.userData.surfaceDistortion = surfaceDistortion;
       if (material.userData.dissolveShader) {
@@ -586,6 +691,19 @@ function onScroll() {
   if (delta > 0.00005) burstRetreating = false;
 
   targetScroll = nextScroll;
+}
+
+function updateModelDrag(deltaSeconds) {
+  modelDrag.yaw = getModelDragReturnStep({
+    current: modelDrag.yaw,
+    dragging: modelDrag.isDragging,
+    deltaSeconds
+  });
+  modelDrag.pitch = getModelDragReturnStep({
+    current: modelDrag.pitch,
+    dragging: modelDrag.isDragging,
+    deltaSeconds
+  });
 }
 
 function updateSceneState(deltaSeconds) {
@@ -617,6 +735,7 @@ function updateSceneState(deltaSeconds) {
     deltaSeconds,
     rate: 7.5
   });
+  updateModelDrag(deltaSeconds);
   pointer.lerp(pointerTarget, 0.09);
   const spectacle = getSpectacleScrollState(smoothScroll);
   const tunnelRelease = getTunnelReleaseAmount({
@@ -626,8 +745,13 @@ function updateSceneState(deltaSeconds) {
   document.documentElement.style.setProperty('--grid-opacity', spectacle.grid.toFixed(3));
   const dissolve = THREE.MathUtils.smoothstep(smoothMorph, 0.08, 0.96);
   const modelOpacity = (1 - THREE.MathUtils.smoothstep(smoothMorph, 0.72, 1)) * modelEntrance.opacity;
-  const surfaceDistortion = spectacle.distortion * (0.18 + pointerPresence * 0.82) * (1 - smoothMorph * 0.42);
+  const softBreath = Math.sin(time * 0.0013) * instrumentMotion.modelBreath;
+  const surfaceDistortion = (spectacle.distortion * (0.18 + pointerPresence * 0.82) + instrumentMotion.surfaceDistortion + softBreath) * (1 - smoothMorph * 0.42);
   setModelState(modelOpacity, dissolve, surfaceDistortion);
+  keyLight.position.set(baseKeyLight.x + instrumentMotion.lightX, baseKeyLight.y + instrumentMotion.lightY, baseKeyLight.z);
+  keyLight.intensity = baseKeyLight.intensity + instrumentMotion.lightIntensity;
+  keyLight.color.copy(baseKeyLightColor).lerp(warmKeyLightColor, instrumentMotion.lightWarmth + instrumentMotion.modelWarmth * 0.45);
+  document.documentElement.style.setProperty('--instrument-signal', instrumentMotion.typographySignal.toFixed(3));
   keyLight.castShadow = shouldRenderFormShadows(smoothMorph, smoothBurst);
   const isMobile = window.innerWidth < 760;
   const mobileComposition = getMobileSceneComposition(smoothScroll);
@@ -638,15 +762,20 @@ function updateSceneState(deltaSeconds) {
   const squashX = 1 + (modelEntrance.squash - 1) * 0.42;
   const squashY = 1 - (modelEntrance.squash - 1) * 0.58;
   assetRoot.scale.set(rootScale * squashX, rootScale * squashY, rootScale);
-  assetRoot.rotation.y = smoothRotation;
+  assetRoot.rotation.y = smoothRotation + instrumentMotion.modelYaw + modelDrag.yaw;
   updateFloor();
   if (particleSystem) {
-    const particleOpacity = THREE.MathUtils.smoothstep(smoothMorph, 0.02, 0.82) * (0.78 - tunnelRelease * 0.18);
+    const particleOpacity = THREE.MathUtils.clamp(THREE.MathUtils.smoothstep(smoothMorph, 0.02, 0.82) * (0.78 - tunnelRelease * 0.18) + instrumentMotion.previewOpacity * (1 - smoothBurst), 0, 0.92);
     particleSystem.material.uniforms.uOpacity.value = particleOpacity;
     particleSystem.material.uniforms.uTransition.value = smoothMorph;
     particleSystem.material.uniforms.uBurst.value = smoothBurst;
     particleSystem.material.uniforms.uDistortion.value = spectacle.distortion * (0.22 + pointerPresence * 0.78);
     particleSystem.material.uniforms.uTunnel.value = tunnelRelease;
+    particleSystem.material.uniforms.uInstrumentVibration.value = instrumentMotion.particleVibration;
+    particleSystem.material.uniforms.uParticleSpeed.value = instrumentMotion.particleSpeed;
+    particleSystem.material.uniforms.uParticleRandomness.value = instrumentMotion.particleRandomness;
+    particleSystem.material.uniforms.uParticleInteraction.value = instrumentMotion.particleInteraction;
+    particleSystem.material.uniforms.uPreviewSize.value = instrumentMotion.previewSize;
     particleSystem.material.uniforms.uTime.value = time;
   }
   const state = smoothMorph < 0.04 ? 'FORM' : tunnelRelease > 0.1 ? 'TUNNEL' : smoothBurst < 0.08 ? 'FIELD' : 'BURST';
@@ -720,7 +849,6 @@ function updateParticlePointer(deltaSeconds) {
   particleSystem.material.uniforms.uPointerActive.value = pointerPresence;
   const motionFollow = getInteractionResponseStep({ current: 0, target: 1, deltaSeconds });
   particleSystem.material.uniforms.uPointerMotion.value.lerp(particlePointerMotion, motionFollow);
-  fluidTrail?.classList.toggle('is-model-active', pointerPresence > 0.06);
 }
 
 function animate(now = 0) {
@@ -734,8 +862,8 @@ function animate(now = 0) {
   time += deltaSeconds * 1000;
   updateSceneState(deltaSeconds);
   if (model) {
-    assetRoot.rotation.x = THREE.MathUtils.lerp(assetRoot.rotation.x, pointer.y * 0.04 + modelEntrance.tilt, 0.04);
-    assetRoot.rotation.z = THREE.MathUtils.lerp(assetRoot.rotation.z, pointer.x * -0.018 + modelEntrance.roll, 0.04);
+    assetRoot.rotation.x = THREE.MathUtils.lerp(assetRoot.rotation.x, pointer.y * 0.04 + modelEntrance.tilt + instrumentMotion.modelPitch + modelDrag.pitch, 0.04);
+    assetRoot.rotation.z = THREE.MathUtils.lerp(assetRoot.rotation.z, pointer.x * -0.018 + modelEntrance.roll + instrumentMotion.modelRoll, 0.04);
   }
   controls.update(deltaSeconds);
   updateParticlePointer(deltaSeconds);
@@ -743,10 +871,59 @@ function animate(now = 0) {
 }
 
 window.addEventListener('scroll', onScroll, { passive: true });
+function isInteractiveModelDragTarget(target) {
+  return target instanceof Element && Boolean(target.closest('a, button, input, select, textarea, [data-elastic-text], [data-magnetic], [data-trail-target], .terminal-warp'));
+}
+
+function isPointerOverSolidModel(event) {
+  if (!model || smoothMorph >= 0.05) return false;
+
+  getPointerNdc(event.clientX, event.clientY, window.innerWidth, window.innerHeight, pointerTarget);
+  assetRoot.updateWorldMatrix(true, true);
+  camera.updateMatrixWorld();
+  pointerRaycaster.setFromCamera(pointerTarget, camera);
+  return pointerRaycaster.intersectObject(model, true).length > 0;
+}
+
+function finishModelDrag(event) {
+  if (!modelDrag.isDragging || (event && event.pointerId !== modelDrag.pointerId)) return;
+  modelDrag.isDragging = false;
+  modelDrag.pointerId = null;
+  document.documentElement.classList.remove('is-model-dragging');
+}
+
+window.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0 || event.pointerType !== 'mouse' || isInteractiveModelDragTarget(event.target) || !isPointerOverSolidModel(event)) return;
+
+  modelDrag.isDragging = true;
+  modelDrag.pointerId = event.pointerId;
+  modelDrag.lastX = event.clientX;
+  modelDrag.lastY = event.clientY;
+  document.documentElement.classList.add('is-model-dragging');
+  event.preventDefault();
+});
 window.addEventListener('pointermove', (event) => {
   hasPointer = true;
   getPointerNdc(event.clientX, event.clientY, window.innerWidth, window.innerHeight, pointerTarget);
+
+  if (!modelDrag.isDragging || event.pointerId !== modelDrag.pointerId) return;
+  const deltaX = event.clientX - modelDrag.lastX;
+  const deltaY = event.clientY - modelDrag.lastY;
+  const nextDragRotation = getModelDragRotation({
+    yaw: modelDrag.yaw,
+    pitch: modelDrag.pitch,
+    deltaX,
+    deltaY
+  });
+  modelDrag.yaw = nextDragRotation.yaw;
+  modelDrag.pitch = nextDragRotation.pitch;
+  modelDrag.lastX = event.clientX;
+  modelDrag.lastY = event.clientY;
+  event.preventDefault();
 });
+window.addEventListener('pointerup', finishModelDrag);
+window.addEventListener('pointercancel', finishModelDrag);
+window.addEventListener('blur', () => finishModelDrag());
 function updateViewport() {
   const isMobile = window.innerWidth < 760;
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -761,12 +938,21 @@ function updateViewport() {
 
 window.addEventListener('resize', updateViewport);
 
+function revealApplication() {
+  if (applicationVisible) return;
+  applicationVisible = true;
+  document.documentElement.classList.remove('app-loading');
+  syncIntroState();
+}
+
 mountTextInteractions();
-mountOriginComponents();
-mountPointerResponses();
+mountReadingResponses();
+instrumentControls = mountInstrumentControls(setInstrumentState);
 motionEffects = mountMotionEffects();
-document.documentElement.classList.remove('app-loading');
-syncIntroState();
+Promise.race([
+  document.fonts?.ready ?? Promise.resolve(),
+  new Promise((resolve) => setTimeout(resolve, 1200))
+]).then(revealApplication, revealApplication);
 onScroll();
 updateViewport();
 animate();
