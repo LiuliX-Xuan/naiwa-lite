@@ -1,7 +1,7 @@
 # NAIWA Interactive Spectacle Design
 
-**Date:** 2026-08-23  
-**Status:** Approved direction, ready for user spec review  
+**Date:** 2026-08-23
+**Status:** Approved direction, ready for user spec review
 **Goal:** Rework the NAIWA story so every meaningful visual and text element responds to the visitor, with Elastic Text as the page's recognisable interaction and one controlled release climax.
 
 ## Core Direction

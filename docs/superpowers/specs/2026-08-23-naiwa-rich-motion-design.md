@@ -1,7 +1,7 @@
 # NAIWA Rich Motion Field Design
 
-**Date:** 2026-08-23  
-**Status:** Approved for planning  
+**Date:** 2026-08-23
+**Status:** Approved for planning
 **Goal:** Add a richer interaction language to the NAIWA 3D story without competing with the character or introducing a new visual theme.
 
 ## Experience

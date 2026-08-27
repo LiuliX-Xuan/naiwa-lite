@@ -2,10 +2,10 @@
 
 ## Comparison Target
 
-- Source visual truth: user request for a centered, oversized `奶娃` terminal mark using the React Bits WarpText configuration; prior terminal screenshot at `C:\Users\cj060\AppData\Local\Temp\codex-clipboard-56e4a3f6-4276-409d-a7c1-156d5c1a1085.png` shows the rejected right-aligned, undersized baseline.
+- Source visual truth: user request for a centered, oversized `奶娃` terminal mark using the React Bits WarpText configuration; a prior terminal screenshot showed the rejected right-aligned, undersized baseline.
 - Implementation: `http://127.0.0.1:5178/` terminal state in the local Vite app.
 - Target viewport: desktop `1280 x 720` CSS pixels, device scale factor unavailable from the in-app browser.
-- Captured implementation evidence: `C:\Users\cj060\projects\dev\naiwa-lite\qa-iab-loading.png`.
+- Captured implementation evidence: `qa-iab-loading.png`.
 
 ## Required Fidelity Surfaces
 

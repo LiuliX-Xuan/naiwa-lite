@@ -40,7 +40,7 @@ test('release tunnel only exists at the end of the scroll story', () => {
 
 - [x] **Step 2: Run failing test**
 
-Run: `node --test tests/interactive-effects.test.js`  
+Run: `node --test tests/interactive-effects.test.js`
 Expected: FAIL because the module does not yet exist.
 
 - [x] **Step 3: Implement the pure helpers**
@@ -76,7 +76,7 @@ export function getSpectacleScrollState(progress = 0) {
 
 - [x] **Step 4: Run passing test**
 
-Run: `node --test tests/interactive-effects.test.js`  
+Run: `node --test tests/interactive-effects.test.js`
 Expected: PASS with 2 tests.
 
 ### Task 2: Add Elastic Text Markup and DOM Interaction Controller
@@ -101,7 +101,7 @@ test('story exposes elastic, magnetic, and trail targets', async () => {
 
 - [x] **Step 2: Run failing test**
 
-Run: `node --test tests/interactive-effects.test.js`  
+Run: `node --test tests/interactive-effects.test.js`
 Expected: FAIL because the attributes are absent.
 
 - [x] **Step 3: Convert display words to accessible draggable glyphs**
@@ -146,7 +146,7 @@ export function mountTextInteractions() {
 
 - [x] **Step 5: Run the focused tests**
 
-Run: `node --test tests/interactive-effects.test.js`  
+Run: `node --test tests/interactive-effects.test.js`
 Expected: PASS with the markup contract.
 
 ### Task 3: Build the CSS Response Layers
@@ -167,7 +167,7 @@ test('response layers include ripple, grid, trail, elastic return, and magnetic 
 
 - [x] **Step 2: Run failing test**
 
-Run: `node --test tests/interactive-effects.test.js`  
+Run: `node --test tests/interactive-effects.test.js`
 Expected: FAIL because the response layers are absent.
 
 - [x] **Step 3: Add fixed non-layout layers and interaction states**
@@ -205,7 +205,7 @@ export function mountPointerResponses() {
 
 - [x] **Step 5: Run the focused tests**
 
-Run: `node --test tests/interactive-effects.test.js`  
+Run: `node --test tests/interactive-effects.test.js`
 Expected: PASS.
 
 ### Task 4: Recompose the Three.js Story
@@ -229,7 +229,7 @@ test('Three scene uses spectacle state with distortion and tunnel uniforms', asy
 
 - [x] **Step 2: Run failing test**
 
-Run: `npm test`  
+Run: `npm test`
 Expected: FAIL because new scene state is not consumed.
 
 - [x] **Step 3: Add two shader uniforms and state consumption**
@@ -259,7 +259,7 @@ Remove `createInteractionField`, the `interactionField` setup, and `updateIntera
 
 - [x] **Step 5: Run the complete suite**
 
-Run: `npm test`  
+Run: `npm test`
 Expected: PASS with updated scene contract coverage.
 
 ### Task 5: Mount, Verify, and Commit
@@ -287,10 +287,10 @@ mountPointerResponses();
 
 - [x] **Step 3: Run automated verification**
 
-Run: `npm test`  
+Run: `npm test`
 Expected: PASS.
 
-Run: `npm run build`  
+Run: `npm run build`
 Expected: production build completes; the existing size warning may remain.
 
 - [x] **Step 4: Run manual visual verification**
@@ -303,5 +303,5 @@ Expected: production build completes; the existing size warning may remain.
 
 - [x] **Step 5: Commit verified implementation**
 
-Run: `git add index.html src/main.js src/model-effects.js src/interactive-effects.js src/text-interactions.js src/styles.css tests/model-effects.test.js tests/interactive-effects.test.js`  
+Run: `git add index.html src/main.js src/model-effects.js src/interactive-effects.js src/text-interactions.js src/styles.css tests/model-effects.test.js tests/interactive-effects.test.js`
 Run: `git commit -m "feat: add interactive spectacle"`
