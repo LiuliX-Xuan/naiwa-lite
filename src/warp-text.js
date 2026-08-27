@@ -212,7 +212,10 @@ export function canUseWarpText(element, { WebGLRenderingContext = globalThis.Web
 }
 
 export function mountWarpText(element, options = {}) {
-  if (!canUseWarpText(element, { createCanvas: () => document.createElement('canvas') })) return undefined;
+  if (!canUseWarpText(element, { createCanvas: () => document.createElement('canvas') })) {
+    element?.classList.add('is-fallback');
+    return undefined;
+  }
 
   const props = {
     text: element.dataset.terminalText || '奶蛙',
@@ -242,6 +245,7 @@ export function mountWarpText(element, options = {}) {
       dpr: Math.min(window.devicePixelRatio || 1, 2)
     });
   } catch {
+    element.classList.add('is-fallback');
     return undefined;
   }
 
@@ -290,6 +294,7 @@ export function mountWarpText(element, options = {}) {
   let reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   let rasterVersion = 0;
   let burstEnergy = 0;
+  let hasRenderedText = false;
 
   canvas.className = 'warp-text-canvas';
   canvas.setAttribute('aria-hidden', 'true');
@@ -299,7 +304,6 @@ export function mountWarpText(element, options = {}) {
   element.style.fontSize = props.fontSize;
   element.style.fontWeight = String(props.fontWeight);
   element.append(canvas);
-  element.classList.add('is-ready');
 
   const renderOnce = () => {
     if (!disposed && !contextLost) renderer.render({ scene: mesh });
@@ -320,6 +324,10 @@ export function mountWarpText(element, options = {}) {
     texture.image = buildTextCanvas({ container: element, width, height, dpr, props });
     texture.needsUpdate = true;
     renderOnce();
+    if (!hasRenderedText) {
+      hasRenderedText = true;
+      element.classList.add('is-ready');
+    }
   };
 
   const resize = () => {
@@ -353,6 +361,8 @@ export function mountWarpText(element, options = {}) {
   const onContextLost = (event) => {
     event.preventDefault();
     contextLost = true;
+    element.classList.remove('is-ready');
+    element.classList.add('is-fallback');
     if (animationFrame) cancelAnimationFrame(animationFrame);
     animationFrame = 0;
   };
@@ -442,6 +452,7 @@ export function mountWarpText(element, options = {}) {
       }
       canvas.remove();
       element.classList.remove('is-ready');
+      element.classList.remove('is-fallback');
     }
   };
 }

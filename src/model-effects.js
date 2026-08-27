@@ -125,8 +125,7 @@ export function getTunnelReleaseAmount({ tunnel = 0, burstIntent = 0 } = {}) {
 export function getInstrumentSceneState({
   origin = 'neutral',
   material = {},
-  signal = { speed: 0.2, chaos: 0.2, touch: 0.35 },
-  release = 'hold'
+  signal = { speed: 0.2, chaos: 0.2, touch: 0.35 }
 } = {}) {
   const roughness = clamp(Number(material.roughness ?? 1), 0, 1);
   const gloss = clamp(Number(material.gloss ?? 0), 0, 1);
@@ -145,7 +144,7 @@ export function getInstrumentSceneState({
       gloss: (gloss - 0.5) * 0.46,
       distortion: Math.max(0, softness - 0.5) * 0.44
     },
-    particles: { vibration: 0, speed, randomness: chaos, interaction: touch, previewOpacity: 0, previewSize: 0 },
+    particles: { vibration: 0, speed, randomness: chaos, interaction: touch },
     typography: { signal: 0 }
   };
 
@@ -172,15 +171,6 @@ export function getInstrumentSceneState({
   state.particles.vibration += chaos * 0.3;
   state.typography.signal += Math.max(speed, chaos) * 0.32;
 
-  if (release === 'trace') {
-    state.particles.previewOpacity = 0.08;
-    state.particles.previewSize = 0.07;
-  }
-  if (release === 'wide') {
-    state.particles.previewOpacity = 0.16;
-    state.particles.previewSize = 0.14;
-  }
-
   return state;
 }
 
@@ -189,12 +179,12 @@ export function getParticleOffset(home, pointer, time, index, out = { x: 0, y: 0
   const dy = home.y - pointer.y;
   const dz = home.z - pointer.z;
   const distance = Math.hypot(dx, dy, dz);
-  const influence = Math.exp(-distance * distance * 2.2);
-  const strength = influence * 0.24;
+  const influence = Math.exp(-distance * distance * 1.55);
+  const strength = influence * 0.34;
   const inverseDistance = distance > 0.0001 ? 1 / distance : 0;
 
   out.x = dx * inverseDistance * strength;
-  out.y = dy * inverseDistance * strength + Math.sin(time * 0.0012 + index * 0.17) * 0.006 * influence;
+  out.y = dy * inverseDistance * strength + Math.sin(time * 0.0012 + index * 0.17) * 0.01 * influence;
   out.z = dz * inverseDistance * strength;
   return out;
 }

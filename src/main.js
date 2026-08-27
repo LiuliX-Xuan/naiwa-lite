@@ -164,8 +164,6 @@ const instrumentMotion = {
   particleSpeed: 0,
   particleRandomness: 0,
   particleInteraction: 0,
-  previewOpacity: 0,
-  previewSize: 0,
   typographySignal: 0
 };
 const baseKeyLight = { x: 4, y: 6, z: 6, intensity: 3.5 };
@@ -173,6 +171,7 @@ const baseKeyLightColor = new THREE.Color(0xfff3cf);
 const warmKeyLightColor = new THREE.Color(0xffdd7b);
 const warmMaterialTint = new THREE.Color(0xffe47b);
 const polishedSpecular = new THREE.Color(0xfff4bf);
+const BASE_MODEL_SATURATION = 1.14;
 const modelEntrance = {
   opacity: 0,
   scale: 0.82,
@@ -201,8 +200,6 @@ function setInstrumentState(state) {
     particleSpeed: next.particles.speed,
     particleRandomness: next.particles.randomness,
     particleInteraction: next.particles.interaction,
-    previewOpacity: next.particles.previewOpacity,
-    previewSize: next.particles.previewSize,
     typographySignal: next.typography.signal,
     duration: 0.72,
     ease: 'power3.out',
@@ -322,6 +319,7 @@ function normalizeModel(root) {
         shader.uniforms.uDissolve = { value: material.userData.dissolve };
         shader.uniforms.uSurfaceDistortion = { value: material.userData.surfaceDistortion };
         shader.uniforms.uDistortionTime = { value: 0 };
+        shader.uniforms.uColorSaturation = { value: BASE_MODEL_SATURATION };
         shader.vertexShader = `uniform float uSurfaceDistortion;\nuniform float uDistortionTime;\n${shader.vertexShader}`;
         shader.vertexShader = shader.vertexShader.replace(
           '#include <begin_vertex>',
@@ -330,7 +328,13 @@ function normalizeModel(root) {
           float liquidWave = sin((position.y - position.x * 0.58) * 12.0 + uDistortionTime * 0.0022);
           transformed += liquidDirection * liquidWave * uSurfaceDistortion * 0.055;`
         );
-        shader.fragmentShader = `uniform float uDissolve;\n${shader.fragmentShader}`;
+        shader.fragmentShader = `uniform float uDissolve;\nuniform float uColorSaturation;\n${shader.fragmentShader}`;
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
+          float luma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+          diffuseColor.rgb = mix(vec3(luma), diffuseColor.rgb, uColorSaturation);`
+        );
         shader.fragmentShader = shader.fragmentShader.replace(
           '#include <alphatest_fragment>',
           `#include <alphatest_fragment>
@@ -537,7 +541,6 @@ function buildParticles(root) {
       uParticleSpeed: { value: 0 },
       uParticleRandomness: { value: 0 },
       uParticleInteraction: { value: 0 },
-      uPreviewSize: { value: 0 },
       uParticleCenter: { value: particleCenter },
       uTime: { value: 0 },
       uPointer: { value: new THREE.Vector3() },
@@ -561,7 +564,6 @@ function buildParticles(root) {
       uniform float uParticleSpeed;
       uniform float uParticleRandomness;
       uniform float uParticleInteraction;
-      uniform float uPreviewSize;
       uniform vec3 uParticleCenter;
       uniform float uTime;
       uniform vec3 uPointer;
@@ -586,21 +588,21 @@ function buildParticles(root) {
         splatPosition += aDrift * speedFlow * 0.09 * uParticleSpeed * entered * (1.0 - burst) * releaseSettle;
         vec3 interactionVector = position - uPointer;
         float interactionDistance = max(length(interactionVector), 0.0001);
-        float interactionInfluence = exp(-interactionDistance * interactionDistance * 2.2);
+        float interactionInfluence = exp(-interactionDistance * interactionDistance * 1.55);
         float ripple = sin(interactionDistance * 14.0 - signalTime * 0.008 + aPhase * 1.7) * 0.5 + 0.5;
-        float interactionStrength = interactionInfluence * (0.14 + ripple * 0.095) * uPointerActive * uParticleInteraction;
+        float interactionStrength = interactionInfluence * (0.22 + ripple * 0.15) * uPointerActive * uParticleInteraction;
         vec3 radialDirection = interactionVector / interactionDistance;
         vec3 swirlAxis = normalize(aNormal + vec3(0.0001, 0.0, 0.0));
         vec3 tangentDirection = cross(swirlAxis, radialDirection);
         tangentDirection /= max(length(tangentDirection), 0.0001);
-        float pointerSpeed = clamp(length(uPointerMotion) * 4.6, 0.0, 1.0);
-        float swirlStrength = interactionInfluence * (0.028 + pointerSpeed * 0.12 + ripple * 0.028) * uPointerActive * uParticleInteraction;
+        float pointerSpeed = clamp(length(uPointerMotion) * 6.2, 0.0, 1.0);
+        float swirlStrength = interactionInfluence * (0.045 + pointerSpeed * 0.16 + ripple * 0.05) * uPointerActive * uParticleInteraction;
         vec3 microDirection = normalize(aDrift + aNormal * 0.42 + vec3(sin(aPhase * 7.0), cos(aPhase * 5.0), sin(aPhase * 3.0)) * 0.08);
         vec3 interactionDirection = normalize(radialDirection * 0.72 + aNormal * 0.22 + microDirection * 0.16);
         splatPosition += interactionDirection * interactionStrength * uTransition * (1.0 - burst) * releaseSettle;
         splatPosition += tangentDirection * swirlStrength * uTransition * (1.0 - burst) * releaseSettle;
-        splatPosition += aDrift * interactionInfluence * (0.012 + ripple * 0.04) * uPointerActive * uParticleInteraction * uTransition * (1.0 - burst) * releaseSettle;
-        splatPosition.y += sin(signalTime * 0.0012 + aPhase * 11.0) * 0.008 * interactionInfluence * uPointerActive * uParticleInteraction * uTransition * (1.0 - burst) * releaseSettle;
+        splatPosition += aDrift * interactionInfluence * (0.022 + ripple * 0.065) * uPointerActive * uParticleInteraction * uTransition * (1.0 - burst) * releaseSettle;
+        splatPosition.y += sin(signalTime * 0.0012 + aPhase * 11.0) * 0.014 * interactionInfluence * uPointerActive * uParticleInteraction * uTransition * (1.0 - burst) * releaseSettle;
         float distortionWave = sin((position.y + position.x * 0.62 + uTime * 0.00085) * 12.0 + aPhase) * uDistortion;
         splatPosition += aNormal * distortionWave * 0.085 * releaseSettle;
         float instrumentWave = sin(aPhase * 5.0 + signalTime * 0.0011) * uInstrumentVibration;
@@ -616,8 +618,9 @@ function buildParticles(root) {
         splatPosition -= uParticleCenter * entered;
         vec4 viewPosition = modelViewMatrix * vec4(splatPosition, 1.0);
         float pulse = 1.0 + sin(signalTime * 0.00055 + aPhase) * 0.045 * uTransition;
+        float interactionPulse = 1.0 + ripple * 0.12 * interactionInfluence * uPointerActive * uParticleInteraction * uTransition * (1.0 - burst) * releaseSettle;
         float releasePulse = 1.0 + sin(uTime * 0.00135) * 0.055 * burstRelease;
-        gl_PointSize = uSize * aScale * (300.0 / max(1.0, -viewPosition.z)) * mix(0.16, 1.0, entered) * mix(1.0, 1.18, burstRelease) * pulse * releasePulse * (1.0 + uPreviewSize * (1.0 - burst));
+        gl_PointSize = uSize * aScale * (300.0 / max(1.0, -viewPosition.z)) * mix(0.16, 1.0, entered) * mix(1.0, 1.18, burstRelease) * pulse * interactionPulse * releasePulse;
         gl_Position = projectionMatrix * viewPosition;
       }
     `,
@@ -765,7 +768,7 @@ function updateSceneState(deltaSeconds) {
   assetRoot.rotation.y = smoothRotation + instrumentMotion.modelYaw + modelDrag.yaw;
   updateFloor();
   if (particleSystem) {
-    const particleOpacity = THREE.MathUtils.clamp(THREE.MathUtils.smoothstep(smoothMorph, 0.02, 0.82) * (0.78 - tunnelRelease * 0.18) + instrumentMotion.previewOpacity * (1 - smoothBurst), 0, 0.92);
+    const particleOpacity = THREE.MathUtils.clamp(THREE.MathUtils.smoothstep(smoothMorph, 0.02, 0.82) * (0.78 - tunnelRelease * 0.18), 0, 0.92);
     particleSystem.material.uniforms.uOpacity.value = particleOpacity;
     particleSystem.material.uniforms.uTransition.value = smoothMorph;
     particleSystem.material.uniforms.uBurst.value = smoothBurst;
@@ -775,7 +778,6 @@ function updateSceneState(deltaSeconds) {
     particleSystem.material.uniforms.uParticleSpeed.value = instrumentMotion.particleSpeed;
     particleSystem.material.uniforms.uParticleRandomness.value = instrumentMotion.particleRandomness;
     particleSystem.material.uniforms.uParticleInteraction.value = instrumentMotion.particleInteraction;
-    particleSystem.material.uniforms.uPreviewSize.value = instrumentMotion.previewSize;
     particleSystem.material.uniforms.uTime.value = time;
   }
   const state = smoothMorph < 0.04 ? 'FORM' : tunnelRelease > 0.1 ? 'TUNNEL' : smoothBurst < 0.08 ? 'FIELD' : 'BURST';

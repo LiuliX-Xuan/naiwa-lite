@@ -49,7 +49,7 @@ test('chapters expose resettable archive instrument controls and a terminal word
   assert.match(page, /data-instrument="origin"/);
   assert.match(page, /data-instrument="material"/);
   assert.match(page, /data-instrument="signal"/);
-  assert.match(page, /data-instrument="release"/);
+  assert.doesNotMatch(page, /data-instrument="release"/);
   assert.match(page, /data-instrument-control/);
   assert.match(page, /class="terminal-mark"/);
   assert.match(page, /data-instrument-key="signal\.speed"/);
@@ -58,7 +58,7 @@ test('chapters expose resettable archive instrument controls and a terminal word
   assert.doesNotMatch(page, /data-instrument-value="pulse"/);
 });
 
-test('terminal wordmark is prepared as a centered burst finale', async () => {
+test('terminal wordmark keeps its pointer refraction and waits for the first font raster before swapping layers', async () => {
   const page = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const motion = await readFile(new URL('../src/motion-effects.js', import.meta.url), 'utf8');
   const styles = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
@@ -69,19 +69,17 @@ test('terminal wordmark is prepared as a centered burst finale', async () => {
   assert.match(page, /data-terminal-text="奶蛙"/);
   assert.match(page, /class="terminal-fallback">奶蛙</);
   assert.match(motion, /mountWarpText/);
-  assert.match(motion, /text: '奶蛙'/);
+  assert.match(motion, /refraction: 0\.018/);
   assert.doesNotMatch(motion, /xPercent: -50/);
   assert.match(motion, /elastic\.out/);
   assert.doesNotMatch(motion, /scrub: 0\.8/);
   assert.match(motion, /toggleActions: 'play none none reverse'/);
   assert.match(motion, /start: 'center 68%'/);
   assert.match(motion, /end: 'center 34%'/);
-  assert.match(motion, /fontFamily: "'ZCOOL QingKe HuangYou', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif"/);
   assert.match(motion, /duration: 0\.36/);
   assert.match(motion, /duration: 0\.85/);
   assert.match(motion, /addLabel\('bounce', 'arrival\+=0\.93'\)/);
   assert.match(motion, /duration: 0\.54/);
-  assert.match(motion, /duration: 0\.72/);
   assert.match(motion, /scaleX: \.8, scaleY: 1\.24/);
   assert.match(motion, /scaleX: 1\.13, scaleY: \.91/);
   assert.match(motion, /elastic\.out\(1, 0\.22\)/);
@@ -101,34 +99,11 @@ test('terminal wordmark is prepared as a centered burst finale', async () => {
   assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.terminal-mark \{ bottom: calc\(clamp\(132px, 18vh, 188px\) \+ 15vh\); \}/);
   assert.doesNotMatch(styles, /@media \(max-width: 760px\)[\s\S]*\.terminal-mark \{ bottom: 12vh; width:/);
   assert.match(styles, /\.terminal-fallback \{[^}]*color: var\(--yellow\)/);
-  assert.match(warpText, /from 'ogl'/);
-  assert.match(warpText, /#version 300 es/);
-  assert.match(warpText, /uWarpStrength/);
-  assert.match(warpText, /uPointerInfluence/);
-  assert.match(warpText, /uPointerActive/);
-  assert.match(warpText, /uMotion/);
-  assert.match(warpText, /uPointerStrength \* 0\.045 \* uPointerActive/);
-  assert.match(warpText, /texture\.needsUpdate/);
-  assert.match(warpText, /height: '320px'/);
-  assert.match(warpText, /terminalText \|\| '奶蛙'/);
-  assert.match(warpText, /refraction: 0\.018/);
-  assert.match(warpText, /fontSize: 'clamp\(6\.6rem, 18\.48vw, 17\.16rem\)'/);
-  assert.match(warpText, /fontWeight: 400/);
-  assert.match(warpText, /letterSpacing: '0\.35em'/);
-  assert.match(warpText, /uMotion: \{ value: 0\.12 \}/);
-  assert.match(warpText, /pointer\.activeTarget > 0 \? 1 : 0/);
-  assert.match(warpText, /0\.12 \+ burstEnergy \* 0\.65/);
-  assert.match(warpText, /element\.style\.height = props\.height/);
-  assert.match(warpText, /element\.clientWidth/);
-  assert.match(warpText, /element\.clientHeight/);
-  assert.match(warpText, /fontFamily: options\.fontFamily \|\| window\.getComputedStyle\(element\)\.fontFamily \|\| 'sans-serif'/);
-  assert.match(warpText, /canvas\.style\.width = '100%'/);
-  assert.match(warpText, /canvas\.style\.height = '100%'/);
-  assert.match(motion, /color: '#f1d865'/);
-  assert.match(motion, /refraction: 0\.018/);
-  assert.match(motion, /fontSize: 'clamp\(6\.6rem, 18\.48vw, 17\.16rem\)'/);
-  assert.match(motion, /fontWeight: 400/);
-  assert.match(motion, /letterSpacing: '0\.35em'/);
+  assert.match(styles, /\.terminal-warp\.is-ready \.terminal-fallback/);
+  assert.match(styles, /\.warp-text-canvas/);
+  assert.match(warpText, /document\.fonts\?\.load/);
+  assert.match(warpText, /texture\.needsUpdate = true;\s*renderOnce\(\);\s*if \(!hasRenderedText\) \{\s*hasRenderedText = true;\s*element\.classList\.add\('is-ready'\);/);
+  assert.match(warpText, /\} catch \{\s*element\.classList\.add\('is-fallback'\);\s*return undefined;/);
   assert.match(motion, /scale: 1\.18/);
   assert.doesNotMatch(motion, /scale: 1\.1(?:,|\s*})/);
   assert.doesNotMatch(motion, /xPercent: -50/);
@@ -239,17 +214,15 @@ test('reading sweep lines contract after the pointer leaves the supporting copy'
   assert.match(styles, /\[data-reading-sweep\]::after \{[^}]*transition: width \.28s/);
 });
 
-test('adjustable instrument controls and their dynamic states are presented in Chinese', async () => {
+test('adjustable instrument controls are presented in Chinese without a release preview selector', async () => {
   const page = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const interactions = await readFile(new URL('../src/text-interactions.js', import.meta.url), 'utf8');
 
-  for (const label of ['表面 / 03', '粗糙度', '高光', '柔软度', '粒子响应', '速度', '随机度', '触感', '释放预览', '保持', '轨迹', '扩散']) {
+  for (const label of ['表面 / 03', '粗糙度', '高光', '柔软度', '粒子响应', '速度', '随机度', '触感']) {
     assert.match(page, new RegExp(`>${label}<`));
   }
-  assert.match(interactions, /releaseStateLabels/);
-  assert.match(interactions, /保持/);
-  assert.match(interactions, /轨迹/);
-  assert.match(interactions, /扩散/);
+  assert.doesNotMatch(page, /释放预览/);
+  assert.doesNotMatch(interactions, /releaseStateLabels/);
 });
 
 test('material controls initialize and reset as a fully rough, unglossed, rigid surface', async () => {
@@ -277,7 +250,7 @@ test('major supporting readouts remain interactive alongside the display text', 
   for (const className of ['hero-note', 'hero-side-note', 'scroll-cue', 'signal-footer', 'release-footer', 'hud']) {
     assert.match(page, new RegExp(`class="${className}"[^>]*data-(?:magnetic|trail-target)`));
   }
-  for (const className of ['material-console', 'signal-console', 'release-console']) {
+  for (const className of ['material-console', 'signal-console']) {
     assert.match(page, new RegExp(`class="${className} instrument-panel"[^>]*data-instrument`));
   }
   assert.match(page, /class="origin-trait is-active"[^>]*data-instrument-control/);
@@ -361,6 +334,44 @@ test('material console keeps the scene open with a transparent minimal treatment
   assert.match(styles, /\.instrument-panel\s*\{[^}]*box-shadow:\s*none/);
   assert.match(styles, /\.instrument-panel\s*\{[^}]*border-radius:\s*0/);
   assert.match(styles, /\.instrument-status\s*\{[^}]*border:\s*0/);
+});
+
+test('material chapter exposes a source portrait that restarts audio on click and stops on the next click', async () => {
+  const page = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const interactions = await readFile(new URL('../src/text-interactions.js', import.meta.url), 'utf8');
+  const styles = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
+
+  assert.match(page, /data-audio-trigger/);
+  assert.match(page, /src="\/assets\/naifrog-source\.png"/);
+  assert.match(page, /src="\/audio\/naifrog-laugh\.mp3"/);
+  assert.match(interactions, /mountAudioTrigger/);
+  assert.match(interactions, /audio\.currentTime = 0/);
+  assert.match(interactions, /audio\.pause\(\)/);
+  assert.match(styles, /\.audio-portrait/);
+  assert.match(styles, /\.audio-portrait\.is-playing/);
+});
+
+test('hero title is lifted and centered while the source portrait shrinks and spins from its center', async () => {
+  const styles = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
+
+  assert.match(styles, /\.hero-title\s*\{[^}]*text-align:\s*center[^}]*transform:\s*translateY\(-6px\)/);
+  assert.match(styles, /\.audio-portrait\s*\{[^}]*left:\s*6\.8vw[^}]*width:\s*min\(22\.68vw, 315\.9px\)/);
+  assert.match(styles, /\.audio-portrait img\s*\{[^}]*transform-origin:\s*center/);
+  assert.match(styles, /\.audio-portrait\.is-playing img\s*\{[^}]*animation:\s*audioPortraitSpin/);
+  assert.match(styles, /@keyframes audioPortraitSpin[\s\S]*rotate\(360deg\)/);
+});
+
+test('source portrait uses the chapter entrance timeline with a visible soft rise', async () => {
+  const motion = await readFile(new URL('../src/motion-effects.js', import.meta.url), 'utf8');
+  const styles = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
+
+  assert.match(styles, /\.audio-portrait\s*\{[^}]*width:\s*min\(22\.68vw, 315\.9px\)/);
+  assert.match(styles, /\.audio-portrait\s*\{[^}]*will-change:\s*transform, opacity/);
+  assert.match(motion, /const audioPortrait = chapter\.querySelector\('\.audio-portrait'\)/);
+  assert.match(motion, /gsap\.set\(audioPortrait, \{ autoAlpha: 0, y: 32, scale: 0\.92, transformOrigin: '50% 50%' \}\)/);
+  assert.match(motion, /timeline\.to\(audioPortrait, \{\s*autoAlpha: 1,\s*y: 0,\s*scale: 1,\s*duration: 0\.64/);
+  assert.match(motion, /const reducedMotionPortraits = \[\.\.\.document\.querySelectorAll\('\.audio-portrait'\)\]/);
+  assert.match(motion, /gsap\.set\(reducedMotionPortraits, \{ autoAlpha: 1, clearProps: 'transform' \}\)/);
 });
 
 test('model entrance uses a soft-gel settle without driving particle release', async () => {

@@ -13,8 +13,6 @@ const chapterSupportSelector = [
   '.signal-readout',
   '.signal-console',
   '.signal-footer',
-  '.release-readout',
-  '.release-console',
   '.release-notes',
   '.release-footer'
 ].join(', ');
@@ -29,6 +27,7 @@ function collectChapterTargets(chapter) {
 
 function createChapterTimeline(chapter) {
   const { eyebrow, titleLines, support } = collectChapterTargets(chapter);
+  const audioPortrait = chapter.querySelector('.audio-portrait');
   const displayOpacity = () => (window.innerWidth < 760 ? 0.5 : 0.78);
 
   gsap.set(chapter, {
@@ -38,6 +37,10 @@ function createChapterTimeline(chapter) {
   if (eyebrow) gsap.set(eyebrow, { autoAlpha: 0, y: 18 });
   if (titleLines.length) gsap.set(titleLines, { autoAlpha: 0, yPercent: 112, rotation: 2 });
   if (support.length) gsap.set(support, { autoAlpha: 0 });
+  if (audioPortrait) {
+    gsap.set(audioPortrait, { autoAlpha: 0, y: 32, scale: 0.92, transformOrigin: '50% 50%' });
+    gsap.set(audioPortrait, { yPercent: -50 });
+  }
 
   const timeline = gsap.timeline({
     defaults: { ease: 'power3.out' },
@@ -71,6 +74,14 @@ function createChapterTimeline(chapter) {
       duration: 0.4,
       stagger: 0.06
     }, 0.42);
+  }
+  if (audioPortrait) {
+    timeline.to(audioPortrait, {
+      autoAlpha: 1,
+      y: 0,
+      scale: 1,
+      duration: 0.64
+    }, 0.28);
   }
 
   return timeline;
@@ -196,17 +207,19 @@ function createFullMotion() {
 }
 
 function createReducedMotion() {
+  const reducedMotionPortraits = [...document.querySelectorAll('.audio-portrait')];
   const visible = [
     document.querySelector('#scene'),
     document.querySelector('.site-header'),
     document.querySelector('.hero .eyebrow'),
     document.querySelector('.hero-title'),
     document.querySelector('.hero-title-meta'),
-    ...document.querySelectorAll('.hero-title .elastic-glyph, .hero-subtitle, .hero-note, .hero-side-note, .scroll-cue, .hud')
-    , document.querySelector('.terminal-mark')
+    ...document.querySelectorAll('.hero-title .elastic-glyph, .hero-subtitle, .hero-note, .hero-side-note, .scroll-cue, .hud'),
+    document.querySelector('.terminal-mark')
   ].filter(Boolean);
 
   gsap.set(visible, { autoAlpha: 1, clearProps: 'transform' });
+  gsap.set(reducedMotionPortraits, { autoAlpha: 1, clearProps: 'transform' });
   gsap.set(document.querySelector('.hero-title'), { '--hero-ghost-opacity': 0.48 });
   return {
     playIntro() {

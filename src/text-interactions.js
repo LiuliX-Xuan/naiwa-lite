@@ -164,29 +164,54 @@ function mountMagneticTarget(element) {
   });
 }
 
+function mountAudioTrigger(element) {
+  const audio = element.querySelector('audio');
+  if (!audio || element.dataset.audioMounted === 'true') return;
+
+  element.dataset.audioMounted = 'true';
+  const reset = () => {
+    element.classList.remove('is-playing');
+    element.setAttribute('aria-pressed', 'false');
+  };
+
+  element.addEventListener('click', () => {
+    if (!audio.paused) {
+      audio.pause();
+      audio.currentTime = 0;
+      reset();
+      return;
+    }
+
+    audio.currentTime = 0;
+    const playRequest = audio.play();
+    playRequest?.catch?.(reset);
+    element.classList.add('is-playing');
+    element.setAttribute('aria-pressed', 'true');
+  });
+
+  audio.addEventListener('ended', reset);
+  audio.addEventListener('pause', () => {
+    if (audio.currentTime === 0 || audio.ended) reset();
+  });
+}
+
 export function mountTextInteractions() {
   document.querySelectorAll('[data-elastic-text]').forEach(mountElasticText);
   document.querySelectorAll('[data-magnetic]').forEach(mountMagneticTarget);
+  document.querySelectorAll('[data-audio-trigger]').forEach(mountAudioTrigger);
 }
 
 const originDetails = {
-  neutral: { code: '中性 / 00', title: '整体形态', copy: '所有参数回到角色的基础状态。' },
-  shell: { code: '外壳 / 01', title: '柔软外壳', copy: '淡黄色软躯干，将重心压在圆胖的体积里。' },
-  stance: { code: '姿态 / 02', title: '中轴姿态', copy: '模型围绕中轴微倾，观察角度与光向一起轻微偏转。' },
-  voice: { code: '声场 / 03', title: '延展笑声', copy: '不改变模型结构，只让粒子和文字留下短促余震。' }
-};
-
-const releaseStateLabels = {
-  hold: '保持',
-  trace: '轨迹',
-  wide: '扩散'
+  neutral: { code: '发呆 / 00', title: '先别急着笑', copy: '它暂时不动，肚子依然很有存在感。' },
+  shell: { code: '大肚 / 01', title: '黄桃罐头肚', copy: '土黄色软躯干把重心全压在肚子上，稳得像刚吃完一顿。' },
+  stance: { code: '开笑 / 02', title: '抱肚子摇一摇', copy: '身体轻轻前后晃，像它已经先听到了自己的笑话。' },
+  voice: { code: '齁声 / 03', title: '脑内循环启动', copy: '模型没变，但粒子和文字开始替它一起绷不住。' }
 };
 
 const defaultInstrumentState = () => ({
   origin: 'shell',
   material: { roughness: 1, gloss: 0, softness: 0 },
-  signal: { speed: 0.2, chaos: 0.2, touch: 0.35 },
-  release: 'hold'
+  signal: { speed: 0.2, chaos: 0.2, touch: 0.35 }
 });
 
 function copyInstrumentState(state) {
@@ -212,7 +237,6 @@ function updateInstrumentOutputs(state) {
   document.querySelectorAll('[data-instrument-output="origin-code"]').forEach((element) => { element.textContent = origin.code; });
   document.querySelectorAll('[data-instrument-output="origin-title"]').forEach((element) => { element.textContent = origin.title; });
   document.querySelectorAll('.origin-profile-detail p').forEach((element) => { element.textContent = origin.copy; });
-  document.querySelectorAll('[data-instrument-output="release-state"]').forEach((element) => { element.textContent = releaseStateLabels[state.release] || releaseStateLabels.hold; });
   ['roughness', 'gloss', 'softness'].forEach((key) => {
     const value = Math.round(state.material[key] * 100);
     document.querySelectorAll(`[data-instrument-output="material-${key}"]`).forEach((element) => { element.textContent = String(value); });
@@ -257,7 +281,6 @@ export function mountInstrumentControls(onChange) {
     if (key === 'origin') state.origin = 'neutral';
     if (key === 'material') state.material = { roughness: 1, gloss: 0, softness: 0 };
     if (key === 'signal') state.signal = { speed: 0.2, chaos: 0.2, touch: 0.35 };
-    if (key === 'release') state.release = 'hold';
     update(key);
   };
 

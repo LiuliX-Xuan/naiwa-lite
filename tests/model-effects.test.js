@@ -38,8 +38,7 @@ test('instrument state modulates the one-piece model without introducing horizon
   const expressive = getInstrumentSceneState({
     origin: 'voice',
     material: { roughness: 0.76, gloss: 0.8, softness: 0.7 },
-    signal: { speed: 0.8, chaos: 0.75, touch: 0.6 },
-    release: 'wide'
+    signal: { speed: 0.8, chaos: 0.75, touch: 0.6 }
   });
   const matte = getInstrumentSceneState({ material: { roughness: 1, gloss: 0 } });
   const polished = getInstrumentSceneState({ material: { roughness: 0, gloss: 1 } });
@@ -63,8 +62,16 @@ test('instrument state modulates the one-piece model without introducing horizon
   assert.equal(expressive.particles.speed, 0.8);
   assert.equal(expressive.particles.randomness, 0.75);
   assert.equal(expressive.particles.interaction, 0.6);
-  assert.ok(expressive.particles.previewOpacity > 0.1);
   assert.ok(expressive.typography.signal > 0.25);
+});
+
+test('model base color boosts saturation without changing particle palette', async () => {
+  const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+
+  assert.match(entry, /const BASE_MODEL_SATURATION = 1\.14/);
+  assert.match(entry, /uColorSaturation/);
+  assert.match(entry, /diffuseColor\.rgb = mix\(vec3\(luma\), diffuseColor\.rgb, uColorSaturation\)/);
+  assert.match(entry, /value: BASE_MODEL_SATURATION/);
 });
 
 test('Three scene consumes the spectacle state instead of the retired orbit field', async () => {
@@ -182,14 +189,24 @@ test('editorial typography keeps headings readable while adding a scroll-linked 
   assert.match(styles, /font-size: clamp\(34px, 9\.7vw, 38px\)/);
 });
 
-test('particle interaction preserves the original silhouette', () => {
+test('particle interaction has a wider, stronger local response while preserving the silhouette', () => {
   const home = { x: 0.5, y: 0.4, z: 0.2 };
   const far = getParticleOffset(home, { x: -2, y: -2, z: 0 }, 1200, 12);
-  assert.ok(Math.hypot(far.x, far.y, far.z) <= 0.012);
+  assert.ok(Math.hypot(far.x, far.y, far.z) <= 0.02);
 
   const near = getParticleOffset(home, { x: 0.52, y: 0.42, z: 0.2 }, 1200, 12);
-  assert.ok(Math.hypot(near.x, near.y, near.z) > 0.2);
-  assert.ok(Math.hypot(near.x, near.y, near.z) <= 0.34);
+  assert.ok(Math.hypot(near.x, near.y, near.z) > 0.3);
+  assert.ok(Math.hypot(near.x, near.y, near.z) <= 0.38);
+});
+
+test('particle shader enlarges pointer influence and motion-driven swirl', async () => {
+  const entry = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+
+  assert.match(entry, /exp\(-interactionDistance \* interactionDistance \* 1\.55\)/);
+  assert.match(entry, /interactionInfluence \* \(0\.22 \+ ripple \* 0\.15\)/);
+  assert.match(entry, /length\(uPointerMotion\) \* 6\.2/);
+  assert.match(entry, /0\.045 \+ pointerSpeed \* 0\.16 \+ ripple \* 0\.05/);
+  assert.match(entry, /float interactionPulse = 1\.0 \+ ripple \* 0\.12 \* interactionInfluence/);
 });
 
 test('particle interaction follows promptly and releases without an instant snap-back', () => {
